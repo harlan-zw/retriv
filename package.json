@@ -1,0 +1,98 @@
+{
+  "name": "vctrize",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Unified vector database abstraction with AI SDK embeddings support.",
+  "author": {
+    "name": "Harlan Wilton",
+    "email": "harlan@harlanzw.com",
+    "url": "https://harlanzw.com/"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/harlan-zw/vctrize"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./drivers/sqlite-vec": {
+      "types": "./dist/drivers/sqlite-vec.d.mts",
+      "import": "./dist/drivers/sqlite-vec.mjs"
+    },
+    "./drivers/libsql": {
+      "types": "./dist/drivers/libsql.d.mts",
+      "import": "./dist/drivers/libsql.mjs"
+    },
+    "./drivers/upstash": {
+      "types": "./dist/drivers/upstash.d.mts",
+      "import": "./dist/drivers/upstash.mjs"
+    },
+    "./drivers/cloudflare": {
+      "types": "./dist/drivers/cloudflare.d.mts",
+      "import": "./dist/drivers/cloudflare.mjs"
+    },
+    "./drivers/pgvector": {
+      "types": "./dist/drivers/pgvector.d.mts",
+      "import": "./dist/drivers/pgvector.mjs"
+    },
+    "./model": {
+      "types": "./dist/model.d.mts",
+      "import": "./dist/model.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "obuild",
+    "dev:prepare": "obuild --stub",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:attw": "attw --pack",
+    "prepack": "pnpm run build"
+  },
+  "peerDependencies": {
+    "@libsql/client": "^0.14.0 || ^0.15.0 || ^0.16.0 || ^0.17.0",
+    "@upstash/vector": "^1.0.0",
+    "ai": "^4.0.0 || ^5.0.0 || ^6.0.0",
+    "better-sqlite3": "^11.0.0 || ^12.0.0",
+    "pg": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@libsql/client": {
+      "optional": true
+    },
+    "@upstash/vector": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "catalog:",
+    "@arethetypeswrong/cli": "catalog:",
+    "@libsql/client": "catalog:",
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
+    "@upstash/vector": "catalog:",
+    "ai": "catalog:",
+    "better-sqlite3": "catalog:",
+    "eslint": "catalog:",
+    "obuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
