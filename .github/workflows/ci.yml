@@ -21,6 +21,9 @@ jobs:
 
       - run: pnpm install
 
+      - name: Clear transformers cache
+        run: rm -rf node_modules/.pnpm/@huggingface+transformers*/node_modules/@huggingface/transformers/.cache
+
       - run: pnpm lint
 
       - run: pnpm typecheck
