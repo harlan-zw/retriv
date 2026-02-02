@@ -38,6 +38,10 @@ pnpm add retriv
 
 Single file with BM25 + vector search. No external services needed.
 
+```bash
+pnpm add @huggingface/transformers sqlite-vec
+```
+
 ```ts
 import { createRetriv } from 'retriv'
 import sqlite from 'retriv/db/sqlite'
@@ -51,17 +55,30 @@ const search = await createRetriv({
 })
 
 await search.index([
-  { id: '1', content: 'How to mass delete Gmail emails using filters' },
-  { id: '2', content: 'Setting up email forwarding rules in Outlook' },
+  {
+    id: '1',
+    content: 'How to mass delete Gmail emails using filters',
+    metadata: { source: 'https://support.google.com/mail', title: 'Gmail Help' },
+  },
+  {
+    id: '2',
+    content: 'Setting up email forwarding rules in Outlook',
+    metadata: { source: 'https://support.microsoft.com', title: 'Outlook Help' },
+  },
 ])
 
-const results = await search.search('bulk remove messages')
+const results = await search.search('bulk remove messages', { returnMetadata: true })
 // Finds #1 via semantic similarity even without keyword overlap
+// results[0].metadata.source → 'https://support.google.com/mail'
 ```
 
 ### Swap to Cloud Embeddings
 
 Same hybrid driver, better embeddings:
+
+```bash
+pnpm add @ai-sdk/openai ai sqlite-vec
+```
 
 ```ts
 import { createRetriv } from 'retriv'
@@ -79,6 +96,10 @@ const search = await createRetriv({
 ### Swap to Cloud Vector DB
 
 For serverless or edge deployments:
+
+```bash
+pnpm add @libsql/client better-sqlite3 @ai-sdk/openai ai
+```
 
 ```ts
 import { createRetriv } from 'retriv'
@@ -103,6 +124,10 @@ const search = await createRetriv({
 ### With Chunking
 
 Automatically split large documents:
+
+```bash
+pnpm add @huggingface/transformers sqlite-vec
+```
 
 ```ts
 import { createRetriv } from 'retriv'
@@ -132,38 +157,40 @@ const results = await search.search('specific topic')
 
 ### Hybrid (Recommended)
 
-| Driver | Import | Use Case |
-|--------|--------|----------|
-| SQLite | `retriv/db/sqlite` | BM25 + vector in single file, Node.js >= 22.5 |
+| Driver | Import | Peer Dependencies |
+|--------|--------|-------------------|
+| SQLite | `retriv/db/sqlite` | `sqlite-vec` (Node.js >= 22.5) |
 
 ### Vector-Only (for composed hybrid)
 
-| Driver | Import | Use Case |
-|--------|--------|----------|
-| LibSQL | `retriv/db/libsql` | Turso, edge |
-| Upstash | `retriv/db/upstash` | Serverless (text-native, no client embeddings) |
-| Cloudflare | `retriv/db/cloudflare` | Cloudflare Workers |
-| pgvector | `retriv/db/pgvector` | PostgreSQL |
-| sqlite-vec | `retriv/db/sqlite-vec` | Local vector-only |
+| Driver | Import | Peer Dependencies |
+|--------|--------|-------------------|
+| LibSQL | `retriv/db/libsql` | `@libsql/client` |
+| Upstash | `retriv/db/upstash` | `@upstash/vector` |
+| Cloudflare | `retriv/db/cloudflare` | — (uses Cloudflare bindings) |
+| pgvector | `retriv/db/pgvector` | `pg` |
+| sqlite-vec | `retriv/db/sqlite-vec` | `sqlite-vec` (Node.js >= 22.5) |
 
 ### Keyword-Only (for composed hybrid)
 
-| Driver | Import | Use Case |
-|--------|--------|----------|
-| SQLite FTS5 | `retriv/db/sqlite-fts` | BM25 ranking |
+| Driver | Import | Peer Dependencies |
+|--------|--------|-------------------|
+| SQLite FTS5 | `retriv/db/sqlite-fts` | `better-sqlite3` |
 
 ## Embedding Providers
 
 All vector drivers accept an `embeddings` config:
 
-```ts
-import { cohere } from 'retriv/embeddings/cohere'
-import { google } from 'retriv/embeddings/google'
-import { mistral } from 'retriv/embeddings/mistral'
-import { ollama } from 'retriv/embeddings/ollama'
-import { openai } from 'retriv/embeddings/openai'
-import { transformers } from 'retriv/embeddings/transformers'
+| Provider | Import | Peer Dependencies |
+|----------|--------|-------------------|
+| OpenAI | `retriv/embeddings/openai` | `@ai-sdk/openai ai` |
+| Google | `retriv/embeddings/google` | `@ai-sdk/google ai` |
+| Mistral | `retriv/embeddings/mistral` | `@ai-sdk/mistral ai` |
+| Cohere | `retriv/embeddings/cohere` | `@ai-sdk/cohere ai` |
+| Ollama | `retriv/embeddings/ollama` | `ollama-ai-provider-v2 ai` |
+| Transformers | `retriv/embeddings/transformers` | `@huggingface/transformers` |
 
+```ts
 // Cloud providers (require API keys)
 openai({ model: 'text-embedding-3-small' })
 google({ model: 'text-embedding-004' })
