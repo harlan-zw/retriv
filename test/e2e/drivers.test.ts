@@ -149,7 +149,7 @@ describe('comparative', () => {
 
 // Destructive tests - run last, use fresh instances
 describe('mutations', () => {
-  it.each(activeDrivers)('$name: remove deletes documents', async ({ _name, factory }) => {
+  it.each(activeDrivers)('$name: remove deletes documents', async ({ factory }) => {
     const db = await factory()
     const subset = docs.slice(0, 10)
     await db.index(subset)
@@ -163,7 +163,7 @@ describe('mutations', () => {
     await db.close?.()
   }, 60_000)
 
-  it.each(activeDrivers)('$name: clear removes all', async ({ _name, factory }) => {
+  it.each(activeDrivers)('$name: clear removes all', async ({ factory }) => {
     const db = await factory()
     const subset = docs.slice(0, 10)
     await db.index(subset)
