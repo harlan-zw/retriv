@@ -21,9 +21,6 @@ jobs:
 
       - run: pnpm install
 
-      - name: Rebuild native modules
-        run: pnpm rebuild better-sqlite3
-
       - run: pnpm lint
 
       - run: pnpm typecheck

@@ -1,7 +1,6 @@
 import type { BaseDriverConfig, Document, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import Database from 'better-sqlite3'
 
 export interface SqliteFtsConfig extends BaseDriverConfig {
   /** Path to SQLite database file. Use ':memory:' for in-memory. */
@@ -11,6 +10,7 @@ export interface SqliteFtsConfig extends BaseDriverConfig {
 /**
  * Create a SQLite FTS5 full-text search provider
  * Uses the built-in FTS5 extension for fast BM25-based search
+ * Requires Node.js >= 22.5
  *
  * @example
  * ```ts
@@ -24,11 +24,14 @@ export interface SqliteFtsConfig extends BaseDriverConfig {
 export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchProvider> {
   const dbPath = config.path || ':memory:'
 
-  if (dbPath !== ':memory:') {
-    mkdirSync(dirname(dbPath), { recursive: true })
-  }
+  const nodeSqlite = globalThis.process?.getBuiltinModule?.('node:sqlite') as typeof import('node:sqlite') | undefined
+  if (!nodeSqlite)
+    throw new Error('node:sqlite not available. Requires Node.js >= 22.5')
 
-  const db = new Database(dbPath)
+  if (dbPath !== ':memory:')
+    mkdirSync(dirname(dbPath), { recursive: true })
+
+  const db = new nodeSqlite.DatabaseSync(dbPath)
 
   // Create FTS5 virtual table with content storage
   db.exec(`
@@ -42,19 +45,23 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
 
   return {
     async index(docs: Document[]) {
-      const insert = db.prepare(`
-        INSERT OR REPLACE INTO documents_fts (id, content, metadata)
-        VALUES (?, ?, ?)
-      `)
-
-      const insertMany = db.transaction((documents: Document[]) => {
-        for (const doc of documents) {
-          insert.run(doc.id, doc.content, doc.metadata ? JSON.stringify(doc.metadata) : null)
+      db.prepare('BEGIN').run()
+      try {
+        for (const doc of docs) {
+          db.prepare('DELETE FROM documents_fts WHERE id = ?').run(doc.id)
+          db.prepare('INSERT INTO documents_fts (id, content, metadata) VALUES (?, ?, ?)').run(
+            doc.id,
+            doc.content,
+            doc.metadata ? JSON.stringify(doc.metadata) : null,
+          )
         }
-      })
-
-      insertMany(docs)
-      return { count: docs.length }
+        db.prepare('COMMIT').run()
+        return { count: docs.length }
+      }
+      catch (error) {
+        db.prepare('ROLLBACK').run()
+        throw error
+      }
     },
 
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
@@ -108,14 +115,18 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
     },
 
     async remove(ids: string[]) {
-      const del = db.prepare('DELETE FROM documents_fts WHERE id = ?')
-      const deleteMany = db.transaction((docIds: string[]) => {
-        for (const id of docIds) {
-          del.run(id)
+      db.prepare('BEGIN').run()
+      try {
+        for (const id of ids) {
+          db.prepare('DELETE FROM documents_fts WHERE id = ?').run(id)
         }
-      })
-      deleteMany(ids)
-      return { count: ids.length }
+        db.prepare('COMMIT').run()
+        return { count: ids.length }
+      }
+      catch (error) {
+        db.prepare('ROLLBACK').run()
+        throw error
+      }
     },
 
     async clear() {
@@ -123,7 +134,7 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
     },
 
     async close() {
-      db.close()
+      db.close?.()
     },
   }
 }

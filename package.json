@@ -97,7 +97,6 @@
     "@libsql/client": "^0.14.0 || ^0.15.0 || ^0.16.0 || ^0.17.0",
     "@upstash/vector": "^1.0.0",
     "ai": "^4.0.0 || ^5.0.0 || ^6.0.0",
-    "better-sqlite3": "^11.0.0 || ^12.0.0",
     "ollama-ai-provider-v2": "^1.0.0",
     "pg": "^8.0.0",
     "sqlite-vec": "^0.1.0-alpha.0"
@@ -127,9 +126,6 @@
     "ai": {
       "optional": true
     },
-    "better-sqlite3": {
-      "optional": true
-    },
     "ollama-ai-provider-v2": {
       "optional": true
     },
@@ -150,13 +146,11 @@
     "@cloudflare/workers-types": "catalog:",
     "@huggingface/transformers": "catalog:",
     "@libsql/client": "catalog:",
-    "@types/better-sqlite3": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@upstash/vector": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "ai": "catalog:",
-    "better-sqlite3": "catalog:",
     "bumpp": "catalog:",
     "eslint": "catalog:",
     "obuild": "catalog:",
