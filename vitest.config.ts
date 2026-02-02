@@ -14,7 +14,15 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['test/**/*.test.ts'],
-          exclude: ['**/node_modules/**', '**/*.eval.test.ts'],
+          exclude: ['**/node_modules/**', 'test/e2e/**'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'e2e',
+          include: ['test/e2e/**/*.test.ts'],
+          exclude: ['**/*.eval.test.ts'],
         },
       },
       {

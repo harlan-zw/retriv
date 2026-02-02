@@ -1,5 +1,6 @@
 import type { BaseDriverConfig, Document, EmbeddingConfig, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { resolveEmbedding } from '../embeddings/resolve'
+import { extractSnippet } from '../utils/extract-snippet'
 
 // Cloudflare Vectorize binding type
 interface VectorizeIndexBinding {
@@ -93,7 +94,10 @@ export async function cloudflare(config: CloudflareConfig): Promise<SearchProvid
         }
 
         if (returnContent && m.metadata?._content) {
-          result.content = m.metadata._content
+          const { snippet, highlights } = extractSnippet(m.metadata._content, query)
+          result.content = snippet
+          if (highlights.length)
+            result._meta = { ...result._meta, highlights }
         }
 
         if (returnMetadata && m.metadata) {

@@ -1,6 +1,7 @@
 import type { BaseDriverConfig, Document, EmbeddingConfig, SearchOptions, SearchProvider, SearchResult } from '../types'
 import pg from 'pg'
 import { resolveEmbedding } from '../embeddings/resolve'
+import { extractSnippet } from '../utils/extract-snippet'
 
 export interface PgvectorConfig extends BaseDriverConfig {
   /** PostgreSQL connection URL */
@@ -128,7 +129,10 @@ export async function pgvector(config: PgvectorConfig): Promise<SearchProvider> 
         }
 
         if (returnContent && row.content) {
-          searchResult.content = row.content
+          const { snippet, highlights } = extractSnippet(row.content, query)
+          searchResult.content = snippet
+          if (highlights.length)
+            searchResult._meta = { ...searchResult._meta, highlights }
         }
 
         if (returnMetadata && row.metadata) {

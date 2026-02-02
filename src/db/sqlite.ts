@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as sqliteVecExt from 'sqlite-vec'
 import { resolveEmbedding } from '../embeddings/resolve'
+import { extractSnippet } from '../utils/extract-snippet'
 
 const RRF_K = 60
 
@@ -193,8 +194,12 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
           id: row.id,
           score: Math.max(0, Math.min(1, 1 / (1 + Math.abs(row.score)))),
         }
-        if (returnContent && row.content)
-          result.content = row.content
+        if (returnContent && row.content) {
+          const { snippet, highlights } = extractSnippet(row.content, query)
+          result.content = snippet
+          if (highlights.length)
+            result._meta = { ...result._meta, highlights }
+        }
         if (returnMetadata && row.metadata)
           result.metadata = JSON.parse(row.metadata)
         return result
@@ -226,8 +231,12 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
           id: meta.id,
           score: 1 / (1 + row.distance),
         }
-        if (returnContent && meta.content)
-          result.content = meta.content
+        if (returnContent && meta.content) {
+          const { snippet, highlights } = extractSnippet(meta.content, query)
+          result.content = snippet
+          if (highlights.length)
+            result._meta = { ...result._meta, highlights }
+        }
         if (returnMetadata && meta.metadata)
           result.metadata = JSON.parse(meta.metadata)
         return result

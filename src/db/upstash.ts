@@ -1,5 +1,6 @@
 import type { BaseDriverConfig, Document, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { Index } from '@upstash/vector'
+import { extractSnippet } from '../utils/extract-snippet'
 
 export interface UpstashConfig extends BaseDriverConfig {
   /** Upstash Vector REST URL */
@@ -75,7 +76,10 @@ export async function upstash(config: UpstashConfig): Promise<SearchProvider> {
         }
 
         if (returnContent && m.metadata?._content) {
-          result.content = m.metadata._content
+          const { snippet, highlights } = extractSnippet(m.metadata._content, query)
+          result.content = snippet
+          if (highlights.length)
+            result._meta = { ...result._meta, highlights }
         }
 
         if (returnMetadata && m.metadata) {

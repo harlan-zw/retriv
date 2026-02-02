@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as sqliteVecExt from 'sqlite-vec'
 import { resolveEmbedding } from '../embeddings/resolve'
+import { extractSnippet } from '../utils/extract-snippet'
 
 export interface SqliteVecConfig extends BaseDriverConfig {
   /** Path to SQLite database file. Use ':memory:' for in-memory. */
@@ -156,7 +157,10 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
         }
 
         if (returnContent && meta.content) {
-          result.content = meta.content
+          const { snippet, highlights } = extractSnippet(meta.content, query)
+          result.content = snippet
+          if (highlights.length)
+            result._meta = { ...result._meta, highlights }
         }
 
         if (returnMetadata && meta.metadata) {

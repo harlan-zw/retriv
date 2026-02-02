@@ -1,6 +1,7 @@
 import type { BaseDriverConfig, Document, EmbeddingConfig, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { createClient } from '@libsql/client'
 import { resolveEmbedding } from '../embeddings/resolve'
+import { extractSnippet } from '../utils/extract-snippet'
 
 export interface LibsqlConfig extends BaseDriverConfig {
   /** Database URL (file:path.db for local, libsql://... for remote) */
@@ -117,7 +118,10 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
         }
 
         if (returnContent && row.content) {
-          result.content = row.content
+          const { snippet, highlights } = extractSnippet(row.content, query)
+          result.content = snippet
+          if (highlights.length)
+            result._meta = { ...result._meta, highlights }
         }
 
         if (returnMetadata && row.metadata) {

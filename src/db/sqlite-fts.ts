@@ -1,6 +1,7 @@
 import type { BaseDriverConfig, Document, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { extractSnippet } from '../utils/extract-snippet'
 
 export interface SqliteFtsConfig extends BaseDriverConfig {
   /** Path to SQLite database file. Use ':memory:' for in-memory. */
@@ -103,7 +104,10 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
         }
 
         if (returnContent && row.content) {
-          result.content = row.content
+          const { snippet, highlights } = extractSnippet(row.content, query)
+          result.content = snippet
+          if (highlights.length)
+            result._meta = { ...result._meta, highlights }
         }
 
         if (returnMetadata && row.metadata) {

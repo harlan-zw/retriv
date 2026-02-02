@@ -87,6 +87,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest --project unit",
+    "test:e2e": "vitest run --project e2e",
     "test:eval": "vitest run --project eval",
     "test:attw": "attw --pack",
     "prepack": "pnpm run build",
