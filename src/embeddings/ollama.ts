@@ -1,6 +1,7 @@
 import type { EmbeddingConfig, EmbeddingProvider, ResolvedEmbedding } from '../types'
 import { embed, embedMany } from 'ai'
 import { createOllama } from 'ollama-ai-provider-v2'
+import { getModelDimensions } from './model-info'
 
 export interface OllamaEmbeddingOptions {
   /** Model name (default: nomic-embed-text) */
@@ -38,8 +39,11 @@ export function ollama(options: OllamaEmbeddingOptions = {}): EmbeddingConfig {
       })
       const embeddingModel: any = ollamaClient.textEmbeddingModel(model)
 
-      const { embedding: testEmbedding } = await embed({ model: embeddingModel, value: 'test' })
-      const dimensions = testEmbedding.length
+      let dimensions = getModelDimensions(model)
+      if (!dimensions) {
+        const { embedding } = await embed({ model: embeddingModel, value: 'test' })
+        dimensions = embedding.length
+      }
 
       const embedder: EmbeddingProvider = async (texts) => {
         if (texts.length === 0)

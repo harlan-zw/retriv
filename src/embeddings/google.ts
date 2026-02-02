@@ -1,6 +1,7 @@
 import type { EmbeddingConfig, EmbeddingProvider, ResolvedEmbedding } from '../types'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { embed, embedMany } from 'ai'
+import { getModelDimensions } from './model-info'
 
 export interface GoogleEmbeddingOptions {
   /** Model name (default: text-embedding-004) */
@@ -37,8 +38,11 @@ export function google(options: GoogleEmbeddingOptions = {}): EmbeddingConfig {
       const googleClient = createGoogleGenerativeAI({ apiKey, baseURL: baseUrl })
       const embeddingModel = googleClient.textEmbeddingModel(model)
 
-      const { embedding: testEmbedding } = await embed({ model: embeddingModel, value: 'test' })
-      const dimensions = testEmbedding.length
+      let dimensions = getModelDimensions(model)
+      if (!dimensions) {
+        const { embedding } = await embed({ model: embeddingModel, value: 'test' })
+        dimensions = embedding.length
+      }
 
       const embedder: EmbeddingProvider = async (texts) => {
         if (texts.length === 0)

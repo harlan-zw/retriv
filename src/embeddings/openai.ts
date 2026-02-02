@@ -1,6 +1,7 @@
 import type { EmbeddingConfig, EmbeddingProvider, ResolvedEmbedding } from '../types'
 import { createOpenAI } from '@ai-sdk/openai'
 import { embed, embedMany } from 'ai'
+import { getModelDimensions } from './model-info'
 
 export interface OpenAIEmbeddingOptions {
   /** Model name (default: text-embedding-3-small) */
@@ -37,8 +38,12 @@ export function openai(options: OpenAIEmbeddingOptions = {}): EmbeddingConfig {
       const openaiClient = createOpenAI({ apiKey, baseURL: baseUrl })
       const embeddingModel = openaiClient.textEmbeddingModel(model)
 
-      const { embedding: testEmbedding } = await embed({ model: embeddingModel, value: 'test' })
-      const dimensions = testEmbedding.length
+      // Use known dimensions or probe with test embedding
+      let dimensions = getModelDimensions(model)
+      if (!dimensions) {
+        const { embedding } = await embed({ model: embeddingModel, value: 'test' })
+        dimensions = embedding.length
+      }
 
       const embedder: EmbeddingProvider = async (texts) => {
         if (texts.length === 0)

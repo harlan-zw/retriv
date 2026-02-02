@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { sqlite } from '../src/db/sqlite'
 import { sqliteFts } from '../src/db/sqlite-fts'
 import { sqliteVec } from '../src/db/sqlite-vec'
-import { transformers } from '../src/embeddings/transformers'
+import { transformersJs } from '../src/embeddings/transformers-js'
 import { createRetriv } from '../src/retriv'
 
 describe('createRetriv', () => {
@@ -129,7 +129,7 @@ describe('createRetriv', () => {
   })
 
   describe('composed drivers (hybrid)', () => {
-    const embeddings = transformers({ model: 'Xenova/all-MiniLM-L6-v2' })
+    const embeddings = transformersJs({ model: 'Xenova/all-MiniLM-L6-v2' })
 
     it('accepts vector + keyword composition', async () => {
       const retriv = await createRetriv({
@@ -228,7 +228,7 @@ describe('createRetriv', () => {
   })
 
   describe('unified sqlite driver', () => {
-    const embeddings = transformers({ model: 'Xenova/all-MiniLM-L6-v2' })
+    const embeddings = transformersJs({ model: 'Xenova/all-MiniLM-L6-v2' })
 
     it('provides native hybrid search', async () => {
       const search = await createRetriv({

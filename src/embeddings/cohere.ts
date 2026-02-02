@@ -1,6 +1,7 @@
 import type { EmbeddingConfig, EmbeddingProvider, ResolvedEmbedding } from '../types'
 import { createCohere } from '@ai-sdk/cohere'
 import { embed, embedMany } from 'ai'
+import { getModelDimensions } from './model-info'
 
 export interface CohereEmbeddingOptions {
   /** Model name (default: embed-english-v3.0) */
@@ -37,8 +38,11 @@ export function cohere(options: CohereEmbeddingOptions = {}): EmbeddingConfig {
       const cohereClient = createCohere({ apiKey, baseURL: baseUrl })
       const embeddingModel = cohereClient.textEmbeddingModel(model)
 
-      const { embedding: testEmbedding } = await embed({ model: embeddingModel, value: 'test' })
-      const dimensions = testEmbedding.length
+      let dimensions = getModelDimensions(model)
+      if (!dimensions) {
+        const { embedding } = await embed({ model: embeddingModel, value: 'test' })
+        dimensions = embedding.length
+      }
 
       const embedder: EmbeddingProvider = async (texts) => {
         if (texts.length === 0)

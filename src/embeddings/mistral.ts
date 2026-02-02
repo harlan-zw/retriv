@@ -1,6 +1,7 @@
 import type { EmbeddingConfig, EmbeddingProvider, ResolvedEmbedding } from '../types'
 import { createMistral } from '@ai-sdk/mistral'
 import { embed, embedMany } from 'ai'
+import { getModelDimensions } from './model-info'
 
 export interface MistralEmbeddingOptions {
   /** Model name (default: mistral-embed) */
@@ -37,8 +38,11 @@ export function mistral(options: MistralEmbeddingOptions = {}): EmbeddingConfig 
       const mistralClient = createMistral({ apiKey, baseURL: baseUrl })
       const embeddingModel = mistralClient.textEmbeddingModel(model)
 
-      const { embedding: testEmbedding } = await embed({ model: embeddingModel, value: 'test' })
-      const dimensions = testEmbedding.length
+      let dimensions = getModelDimensions(model)
+      if (!dimensions) {
+        const { embedding } = await embed({ model: embeddingModel, value: 'test' })
+        dimensions = embedding.length
+      }
 
       const embedder: EmbeddingProvider = async (texts) => {
         if (texts.length === 0)
