@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { sqliteFts } from '../../src/db/sqlite-fts'
 import { sqliteVec } from '../../src/db/sqlite-vec'
-import { transformers } from '../../src/embeddings/transformers'
+import { transformersJs } from '../../src/embeddings/transformers-js'
 import { createRetriv } from '../../src/retriv'
 import { loadNuxtDocs } from './fixtures/nuxt-docs'
 
@@ -19,7 +19,7 @@ describe('hybrid accuracy comparison', () => {
     const docs = await loadNuxtDocs()
     const subset = docs.slice(0, 30) // Use subset for speed
 
-    const embeddings = transformers({ model: 'Xenova/all-MiniLM-L6-v2' })
+    const embeddings = transformersJs({ model: 'Xenova/all-MiniLM-L6-v2', dimensions: 384 })
 
     // Create drivers
     const fts = await sqliteFts({ path: ':memory:' })

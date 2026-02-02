@@ -59,7 +59,7 @@ describe.each(drivers.filter(d => !d.skip))('$name', ({ factory }) => {
   }, 120_000)
 
   afterAll(async () => {
-    await db.close?.()
+    await db?.close?.()
   })
 
   it('returns results for valid query', async () => {

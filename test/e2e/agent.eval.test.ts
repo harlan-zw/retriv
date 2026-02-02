@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import { sqliteFts } from '../../src/db/sqlite-fts'
 import { sqliteVec } from '../../src/db/sqlite-vec'
-import { transformers } from '../../src/embeddings/transformers'
+import { transformersJs } from '../../src/embeddings/transformers-js'
 import { createRetriv } from '../../src/retriv'
 import { loadNuxtReferences } from './fixtures/nuxt-references'
 
@@ -63,7 +63,7 @@ describe('agent eval', () => {
     const docs = loadNuxtReferences()
     console.log(`\nLoaded ${docs.length} reference docs\n`)
 
-    const embeddings = transformers({ model: 'Xenova/all-MiniLM-L6-v2' })
+    const embeddings = transformersJs({ model: 'Xenova/all-MiniLM-L6-v2', dimensions: 384 })
 
     // Create all three search methods
     const fts = await sqliteFts({ path: ':memory:' })

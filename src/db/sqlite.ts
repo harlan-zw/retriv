@@ -51,11 +51,11 @@ function applyRRF(ftsResults: SearchResult[], vecResults: SearchResult[]): Searc
  * @example
  * ```ts
  * import { sqlite } from 'retriv/db/sqlite'
- * import { transformers } from 'retriv/embeddings/transformers'
+ * import { transformersJs } from 'retriv/embeddings/transformers-js'
  *
  * const db = await sqlite({
  *   path: 'search.db',
- *   embeddings: transformers({ model: 'Xenova/all-MiniLM-L6-v2' }),
+ *   embeddings: transformersJs({ model: 'Xenova/all-MiniLM-L6-v2', dimensions: 384 }),
  * })
  *
  * await db.index([{ id: '1', content: 'hello world' }])

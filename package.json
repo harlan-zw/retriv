@@ -59,9 +59,9 @@
       "types": "./dist/embeddings/ollama.d.mts",
       "import": "./dist/embeddings/ollama.mjs"
     },
-    "./embeddings/transformers": {
-      "types": "./dist/embeddings/transformers.d.mts",
-      "import": "./dist/embeddings/transformers.mjs"
+    "./embeddings/transformers-js": {
+      "types": "./dist/embeddings/transformers-js.d.mts",
+      "import": "./dist/embeddings/transformers-js.mjs"
     },
     "./embeddings/mistral": {
       "types": "./dist/embeddings/mistral.d.mts",
@@ -70,6 +70,10 @@
     "./embeddings/cohere": {
       "types": "./dist/embeddings/cohere.d.mts",
       "import": "./dist/embeddings/cohere.mjs"
+    },
+    "./embeddings/model-info": {
+      "types": "./dist/embeddings/model-info.d.mts",
+      "import": "./dist/embeddings/model-info.mjs"
     }
   },
   "main": "./dist/index.mjs",

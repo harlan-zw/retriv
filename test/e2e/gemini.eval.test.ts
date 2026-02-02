@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { sqliteFts } from '../../src/db/sqlite-fts'
 import { sqliteVec } from '../../src/db/sqlite-vec'
-import { transformers } from '../../src/embeddings/transformers'
+import { transformersJs } from '../../src/embeddings/transformers-js'
 import { createRetriv } from '../../src/retriv'
 import { loadNuxtDocs } from './fixtures/nuxt-docs'
 
@@ -71,7 +71,7 @@ function checkRetrieval(results: Array<{ content?: string }>, mustContain: strin
 describe('gemini eval', () => {
   it('a) binary correctness - can answer factual questions', async () => {
     const docs = await loadNuxtDocs()
-    const embeddings = transformers({ model: 'Xenova/all-MiniLM-L6-v2' })
+    const embeddings = transformersJs({ model: 'Xenova/all-MiniLM-L6-v2', dimensions: 384 })
 
     const fts = await sqliteFts({ path: ':memory:' })
     const vec = await sqliteVec({ path: ':memory:', embeddings })
@@ -122,7 +122,7 @@ describe('gemini eval', () => {
 
   it('b) doc retrieval - retrieves relevant content', async () => {
     const docs = await loadNuxtDocs()
-    const embeddings = transformers({ model: 'Xenova/all-MiniLM-L6-v2' })
+    const embeddings = transformersJs({ model: 'Xenova/all-MiniLM-L6-v2', dimensions: 384 })
 
     const fts = await sqliteFts({ path: ':memory:' })
     const vec = await sqliteVec({ path: ':memory:', embeddings })
@@ -173,7 +173,7 @@ describe('gemini eval', () => {
 
   it('c) semantic retrieval - vector should outperform FTS', async () => {
     const docs = await loadNuxtDocs()
-    const embeddings = transformers({ model: 'Xenova/all-MiniLM-L6-v2' })
+    const embeddings = transformersJs({ model: 'Xenova/all-MiniLM-L6-v2', dimensions: 384 })
 
     const fts = await sqliteFts({ path: ':memory:' })
     const vec = await sqliteVec({ path: ':memory:', embeddings })
