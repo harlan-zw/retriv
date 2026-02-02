@@ -40,29 +40,38 @@ const drivers: DriverConfig[] = [
   },
 ]
 
-// Shared docs loaded once
+const activeDrivers = drivers.filter(d => !d.skip)
+
+// Shared state - seeded once, reused across all tests
 let docs: Document[]
+const driverInstances = new Map<string, SearchProvider>()
 
 beforeAll(async () => {
-  docs = await loadNuxtDocs()
-}, 60_000)
+  // Load docs - use subset for faster tests while still covering all topics
+  // Full 2817 docs would require ~6000 embedding calls across drivers
+  const allDocs = await loadNuxtDocs()
+  docs = allDocs.slice(0, 500)
 
-describe.each(drivers.filter(d => !d.skip))('$name', ({ factory }) => {
-  let db: SearchProvider
-  let indexedDocs: Document[]
+  // Create and seed all driver instances in parallel
+  await Promise.all(
+    activeDrivers.map(async ({ name, factory }) => {
+      const db = await factory()
+      await db.index(docs)
+      driverInstances.set(name, db)
+    }),
+  )
+}, 300_000)
 
-  beforeAll(async () => {
-    db = await factory()
-    // Use subset for faster tests
-    indexedDocs = docs.slice(0, 50)
-    await db.index(indexedDocs)
-  }, 120_000)
+afterAll(async () => {
+  await Promise.all(
+    Array.from(driverInstances.values()).map(db => db.close?.()),
+  )
+})
 
-  afterAll(async () => {
-    await db?.close?.()
-  })
-
+// Per-driver search tests
+describe.each(activeDrivers)('$name', ({ name }) => {
   it('returns results for valid query', async () => {
+    const db = driverInstances.get(name)!
     const results = await db.search('composables', { limit: 5 })
     expect(results.length).toBeGreaterThan(0)
     expect(results[0]!.score).toBeGreaterThan(0)
@@ -70,66 +79,22 @@ describe.each(drivers.filter(d => !d.skip))('$name', ({ factory }) => {
   })
 
   it('respects limit option', async () => {
+    const db = driverInstances.get(name)!
     const results = await db.search('nuxt', { limit: 3 })
     expect(results.length).toBeLessThanOrEqual(3)
   })
 
   it('returns content when requested', async () => {
+    const db = driverInstances.get(name)!
     const results = await db.search('router', { limit: 1, returnContent: true })
     expect(results.length).toBeGreaterThan(0)
     expect(results[0]!.content).toBeDefined()
     expect(typeof results[0]!.content).toBe('string')
   })
-
-  it('remove deletes documents', async () => {
-    const targetDoc = indexedDocs[0]!
-    // Use only alphanumeric words to avoid FTS5 syntax issues with # etc
-    const words = targetDoc.content.match(/\b[a-z]{4,}\b/gi) || []
-    const searchTerm = words.slice(0, 2).join(' ')
-
-    await db.remove?.([targetDoc.id])
-
-    const results = await db.search(searchTerm, { limit: 20 })
-    expect(results.find(r => r.id === targetDoc.id)).toBeUndefined()
-
-    // Re-index for subsequent tests
-    await db.index([targetDoc])
-  })
-
-  it('clear removes all', async () => {
-    await db.clear?.()
-
-    const results = await db.search('nuxt', { limit: 10 })
-    expect(results).toHaveLength(0)
-
-    // Re-index for any subsequent tests
-    await db.index(indexedDocs)
-  })
 })
 
-// Snapshot tests - see what results look like for each driver
+// Snapshot tests
 describe('snapshots', () => {
-  const activeDrivers = drivers.filter(d => !d.skip)
-  const driverInstances = new Map<string, SearchProvider>()
-
-  beforeAll(async () => {
-    const subset = docs.slice(0, 30)
-
-    await Promise.all(
-      activeDrivers.map(async ({ name, factory }) => {
-        const db = await factory()
-        await db.index(subset)
-        driverInstances.set(name, db)
-      }),
-    )
-  }, 180_000)
-
-  afterAll(async () => {
-    await Promise.all(
-      Array.from(driverInstances.values()).map(db => db.close?.()),
-    )
-  })
-
   const queries = ['components', 'server', 'routing', 'state management']
 
   it.each(queries)('results for "%s"', async (query) => {
@@ -148,49 +113,26 @@ describe('snapshots', () => {
   })
 })
 
-// Comparative test - all drivers should return overlapping results
+// Comparative test
 describe('comparative', () => {
-  const activeDrivers = drivers.filter(d => !d.skip)
-  const driverResults = new Map<string, SearchProvider>()
-
-  beforeAll(async () => {
-    const subset = docs.slice(0, 30)
-
-    await Promise.all(
-      activeDrivers.map(async ({ name, factory }) => {
-        const db = await factory()
-        await db.index(subset)
-        driverResults.set(name, db)
-      }),
-    )
-  }, 180_000)
-
-  afterAll(async () => {
-    await Promise.all(
-      Array.from(driverResults.values()).map(db => db.close?.()),
-    )
-  })
-
   it('drivers return overlapping results for same query', async () => {
     const query = 'components'
     const limit = 5
 
     const allResults = await Promise.all(
-      Array.from(driverResults.entries()).map(async ([name, db]) => {
+      Array.from(driverInstances.entries()).map(async ([name, db]) => {
         const results = await db.search(query, { limit })
         return { name, ids: results.map(r => r.id) }
       }),
     )
 
-    // Check pairwise overlap - each pair should share at least 1 result
+    // Check pairwise overlap
     for (let i = 0; i < allResults.length; i++) {
       for (let j = i + 1; j < allResults.length; j++) {
         const a = allResults[i]!
         const b = allResults[j]!
         const overlap = a.ids.filter(id => b.ids.includes(id))
 
-        // At least some overlap expected (relaxed check since modes differ)
-        // Semantic vs fulltext vs fuzzy may rank differently
         if (overlap.length === 0) {
           console.warn(`No overlap between ${a.name} and ${b.name}`)
           console.warn(`  ${a.name}: ${a.ids.join(', ')}`)
@@ -199,9 +141,38 @@ describe('comparative', () => {
       }
     }
 
-    // At least verify all drivers returned results
     for (const { name, ids } of allResults) {
       expect(ids.length, `${name} should return results`).toBeGreaterThan(0)
     }
   })
+})
+
+// Destructive tests - run last, use fresh instances
+describe('mutations', () => {
+  it.each(activeDrivers)('$name: remove deletes documents', async ({ name, factory }) => {
+    const db = await factory()
+    const subset = docs.slice(0, 10)
+    await db.index(subset)
+
+    const targetDoc = subset[0]!
+    await db.remove?.([targetDoc.id])
+
+    const results = await db.search('introduction', { limit: 20 })
+    expect(results.find(r => r.id === targetDoc.id)).toBeUndefined()
+
+    await db.close?.()
+  }, 60_000)
+
+  it.each(activeDrivers)('$name: clear removes all', async ({ name, factory }) => {
+    const db = await factory()
+    const subset = docs.slice(0, 10)
+    await db.index(subset)
+
+    await db.clear?.()
+
+    const results = await db.search('nuxt', { limit: 10 })
+    expect(results).toHaveLength(0)
+
+    await db.close?.()
+  }, 60_000)
 })

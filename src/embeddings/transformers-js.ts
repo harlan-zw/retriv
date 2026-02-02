@@ -42,7 +42,7 @@ async function clearCorruptedCache(error: unknown, model: string): Promise<boole
  * ```
  */
 export function transformersJs(options: TransformersEmbeddingOptions = {}): EmbeddingConfig {
-  const baseModel = options.model ?? 'bge-base-en-v1.5'
+  const baseModel = options.model ?? 'bge-small-en-v1.5'
   const model = resolveModelForPreset(baseModel, 'transformers.js')
   let cached: ResolvedEmbedding | null = null
 

@@ -18,7 +18,7 @@ export const DEFAULT_MODELS: Record<EmbeddingPreset, { model: string, dimensions
   'mistral': { model: 'mistral-embed', dimensions: 1024 },
   'cohere': { model: 'embed-english-v3.0', dimensions: 1024 },
   'ollama': { model: 'nomic-embed-text', dimensions: 768 },
-  'transformers.js': { model: 'Xenova/bge-base-en-v1.5', dimensions: 768 },
+  'transformers.js': { model: 'Xenova/bge-small-en-v1.5', dimensions: 384 },
 }
 
 /**
