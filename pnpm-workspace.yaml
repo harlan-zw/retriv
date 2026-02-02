@@ -16,6 +16,7 @@ catalog:
   '@upstash/vector': ^1.2.2
   '@vitest/coverage-v8': ^4.0.18
   ai: ^6.0.67
+  ai-sdk-provider-gemini-cli: ^2.0.1
   bumpp: ^10.4.0
   eslint: ^9.39.2
   obuild: ^0.4.22

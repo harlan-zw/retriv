@@ -1,5 +1,7 @@
-import { execSync } from 'node:child_process'
-import { describe, expect, it } from 'vitest'
+import type { SearchProvider } from '../../src/types'
+import { generateText } from 'ai'
+import { createGeminiProvider } from 'ai-sdk-provider-gemini-cli'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { sqliteFts } from '../../src/db/sqlite-fts'
 import { sqliteVec } from '../../src/db/sqlite-vec'
 import { transformersJs } from '../../src/embeddings/transformers-js'
@@ -12,33 +14,30 @@ interface AgentResult {
   timeMs: number
 }
 
-function askGeminiWithRetrieval(question: string, context: string, sources: string[]): AgentResult {
-  const sourcesInfo = sources.length > 0
-    ? `\n\nSource files (read with readFile if needed):\n${sources.join('\n')}`
-    : ''
+const gemini = createGeminiProvider({ authType: 'oauth-personal' })
 
+async function askGeminiWithRetrieval(question: string, context: string): Promise<AgentResult> {
   const prompt = `Answer this question in ONE sentence:
 
 ${question}
 
 Here are relevant docs:
-${context}${sourcesInfo}
+${context}
 
 Give a direct, concise answer.`
 
-  const escaped = prompt.replace(/'/g, `'\\''`)
   const start = Date.now()
   try {
-    const response = execSync(`gemini -p '${escaped}'`, {
-      encoding: 'utf8',
-      timeout: 120_000,
-    }).trim()
+    const { text } = await generateText({
+      model: gemini('gemini-3-flash-preview'),
+      prompt,
+    })
     const timeMs = Date.now() - start
-    return { answer: response, correct: false, timeMs }
+    return { answer: text.trim(), correct: false, timeMs }
   }
   catch (e: any) {
     const timeMs = Date.now() - start
-    return { answer: `ERROR: ${e.message?.slice(0, 50) || 'timeout'}`, correct: false, timeMs }
+    return { answer: `ERROR: ${e.message?.slice(0, 50) || 'unknown'}`, correct: false, timeMs }
   }
 }
 
@@ -56,19 +55,30 @@ const evalQuestions = [
     question: 'What is the name of the directory where you put reusable Vue composables in Nuxt?',
     keywords: ['composables'],
   },
+  {
+    question: 'What Nuxt composable fetches data and caches it by key?',
+    keywords: ['useAsyncData', 'useFetch'],
+  },
+  {
+    question: 'What file extension makes middleware run on every route in Nuxt?',
+    keywords: ['.global'],
+  },
 ]
 
 describe('agent eval', () => {
-  it('compares FTS vs Vector vs Hybrid retrieval', async () => {
+  let fts: SearchProvider
+  let vec: SearchProvider
+  let hybrid: SearchProvider
+
+  beforeAll(async () => {
     const docs = loadNuxtReferences()
     console.log(`\nLoaded ${docs.length} reference docs\n`)
 
     const embeddings = transformersJs({ model: 'Xenova/all-MiniLM-L6-v2', dimensions: 384 })
 
-    // Create all three search methods
-    const fts = await sqliteFts({ path: ':memory:' })
-    const vec = await sqliteVec({ path: ':memory:', embeddings })
-    const hybrid = await createRetriv({
+    fts = await sqliteFts({ path: ':memory:' })
+    vec = await sqliteVec({ path: ':memory:', embeddings })
+    hybrid = await createRetriv({
       driver: {
         keyword: sqliteFts({ path: ':memory:' }),
         vector: sqliteVec({ path: ':memory:', embeddings }),
@@ -77,7 +87,13 @@ describe('agent eval', () => {
 
     await Promise.all([fts.index(docs), vec.index(docs), hybrid.index(docs)])
     console.log('Indexed docs into all three methods\n')
+  }, 300_000)
 
+  afterAll(async () => {
+    await Promise.all([fts.close?.(), vec.close?.(), hybrid.close?.()])
+  })
+
+  it('compares FTS vs Vector vs Hybrid retrieval', async () => {
     const results: Array<{
       question: string
       fts: AgentResult
@@ -98,13 +114,12 @@ describe('agent eval', () => {
       const formatContext = (results: typeof ftsResults) =>
         results.map((r, i) => `[${i + 1}] ${r.metadata?.title || r.id}\n${r.content}`).join('\n\n---\n\n')
 
-      const getSources = (results: typeof ftsResults) =>
-        results.map(r => r.metadata?.source as string).filter(Boolean)
-
       // Ask Gemini with each context
-      const ftsResult = askGeminiWithRetrieval(question, formatContext(ftsResults), getSources(ftsResults))
-      const vecResult = askGeminiWithRetrieval(question, formatContext(vecResults), getSources(vecResults))
-      const hybridResult = askGeminiWithRetrieval(question, formatContext(hybridResults), getSources(hybridResults))
+      const [ftsResult, vecResult, hybridResult] = await Promise.all([
+        askGeminiWithRetrieval(question, formatContext(ftsResults)),
+        askGeminiWithRetrieval(question, formatContext(vecResults)),
+        askGeminiWithRetrieval(question, formatContext(hybridResults)),
+      ])
 
       // Check correctness
       const checkCorrect = (text: string) =>
@@ -143,7 +158,5 @@ describe('agent eval', () => {
     console.log(`\nHybrid vs best single: ${hybridScore >= bestSingle ? '✓ Hybrid wins/ties' : '✗ Single method better'}`)
 
     expect(hybridScore).toBeGreaterThanOrEqual(Math.min(ftsScore, vecScore))
-
-    await Promise.all([fts.close?.(), vec.close?.(), hybrid.close?.()])
   }, 600_000)
 })

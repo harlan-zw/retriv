@@ -155,6 +155,7 @@
     "@upstash/vector": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "ai": "catalog:",
+    "ai-sdk-provider-gemini-cli": "catalog:",
     "bumpp": "catalog:",
     "eslint": "catalog:",
     "obuild": "catalog:",

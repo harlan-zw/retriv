@@ -244,18 +244,18 @@ interface SearchResult {
 
 ## Benchmarks
 
-Retrieval accuracy on Nuxt documentation (639 docs):
+Retrieval accuracy on Nuxt documentation (2,817 chunks):
 
 | Test Type | FTS | Vector | Hybrid |
 |-----------|-----|--------|--------|
-| Exact terminology (ports, config names) | 3/3 | 2/3 | 3/3 |
-| Doc retrieval (keyword overlap) | 3/3 | 2/3 | 3/3 |
-| Semantic queries (synonyms, no overlap) | 0/3 | 3/3 | 3/3 |
-| **Total** | **6/9 (67%)** | **7/9 (78%)** | **9/9 (100%)** |
+| Exact terminology (ports, config names) | 7/7 | 5/7 | 7/7 |
+| Doc retrieval (keyword overlap) | 0/7 | 5/7 | 5/7 |
+| Semantic queries (synonyms, no overlap) | 1/6 | 5/6 | 5/6 |
+| **Total** | **8/20 (40%)** | **15/20 (75%)** | **17/20 (85%)** |
 
 - **FTS** excels at exact terms but fails semantic queries ("reuse logic" → composables)
-- **Vector** understands meaning but misses precise terminology ("port 3000")
-- **Hybrid** combines both - never worse than either method alone
+- **Vector** understands meaning but misses precise terminology (".global" suffix)
+- **Hybrid** combines both - best overall recall across query types
 
 Run locally: `pnpm test:eval`
 
