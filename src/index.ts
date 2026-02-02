@@ -1,28 +1,15 @@
-// Types
+// Main factory
+export { createRetriv } from './retriv'
+
+// Core types
 export type {
-  DriverConfig,
-  VectorDbProvider,
-  VectorFloatArray,
-  VectorizeMatch,
-  VectorizeMatches,
-  VectorizeQueryOptions,
-  VectorizeVector,
-  VectorizeVectorMetadata,
+  ChunkInfo,
+  ChunkingOptions,
+  Document,
+  EmbeddingConfig,
+  EmbeddingProvider,
+  RetrivOptions,
+  SearchOptions,
+  SearchProvider,
+  SearchResult,
 } from './types'
-
-// Adapter
-export type { EmbedderAdapter, EmbedderAdapterConfig } from './adapter'
-export { createAdapter } from './adapter'
-
-// Model utilities
-export type { AISDKProvider, ProviderConfig, ProviderPreset } from './model'
-export {
-  DEFAULT_MODELS,
-  getModelDimensions,
-  isReasoningModel,
-  MODEL_DIMENSIONS,
-  normalizeProviderConfig,
-  resolveModelForPreset,
-  supportsQueryRewriting,
-  supportsTools,
-} from './model'

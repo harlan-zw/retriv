@@ -8,3 +8,4 @@ dist
 .nuxt
 .output
 coverage
+.retriv

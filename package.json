@@ -1,8 +1,9 @@
 {
-  "name": "vctrize",
+  "name": "retriv",
   "type": "module",
   "version": "0.0.1",
-  "description": "Unified vector database abstraction with AI SDK embeddings support.",
+  "packageManager": "pnpm@10.28.2+sha512.41872f037ad22f7348e3b1debbaf7e867cfd448f2726d9cf74c08f19507c31d2c8e7a11525b983febc2df640b5438dee6023ebb1f84ed43cc2d654d2bc326264",
+  "description": "Unified document retrieval for search - semantic, full-text, and fuzzy.",
   "author": {
     "name": "Harlan Wilton",
     "email": "harlan@harlanzw.com",
@@ -11,36 +12,64 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/harlan-zw/vctrize"
+    "url": "https://github.com/harlan-zw/retriv"
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
-    "./drivers/sqlite-vec": {
-      "types": "./dist/drivers/sqlite-vec.d.mts",
-      "import": "./dist/drivers/sqlite-vec.mjs"
+    "./db/sqlite": {
+      "types": "./dist/db/sqlite.d.mts",
+      "import": "./dist/db/sqlite.mjs"
     },
-    "./drivers/libsql": {
-      "types": "./dist/drivers/libsql.d.mts",
-      "import": "./dist/drivers/libsql.mjs"
+    "./db/sqlite-vec": {
+      "types": "./dist/db/sqlite-vec.d.mts",
+      "import": "./dist/db/sqlite-vec.mjs"
     },
-    "./drivers/upstash": {
-      "types": "./dist/drivers/upstash.d.mts",
-      "import": "./dist/drivers/upstash.mjs"
+    "./db/sqlite-fts": {
+      "types": "./dist/db/sqlite-fts.d.mts",
+      "import": "./dist/db/sqlite-fts.mjs"
     },
-    "./drivers/cloudflare": {
-      "types": "./dist/drivers/cloudflare.d.mts",
-      "import": "./dist/drivers/cloudflare.mjs"
+    "./db/libsql": {
+      "types": "./dist/db/libsql.d.mts",
+      "import": "./dist/db/libsql.mjs"
     },
-    "./drivers/pgvector": {
-      "types": "./dist/drivers/pgvector.d.mts",
-      "import": "./dist/drivers/pgvector.mjs"
+    "./db/upstash": {
+      "types": "./dist/db/upstash.d.mts",
+      "import": "./dist/db/upstash.mjs"
     },
-    "./model": {
-      "types": "./dist/model.d.mts",
-      "import": "./dist/model.mjs"
+    "./db/pgvector": {
+      "types": "./dist/db/pgvector.d.mts",
+      "import": "./dist/db/pgvector.mjs"
+    },
+    "./db/cloudflare": {
+      "types": "./dist/db/cloudflare.d.mts",
+      "import": "./dist/db/cloudflare.mjs"
+    },
+    "./embeddings/openai": {
+      "types": "./dist/embeddings/openai.d.mts",
+      "import": "./dist/embeddings/openai.mjs"
+    },
+    "./embeddings/google": {
+      "types": "./dist/embeddings/google.d.mts",
+      "import": "./dist/embeddings/google.mjs"
+    },
+    "./embeddings/ollama": {
+      "types": "./dist/embeddings/ollama.d.mts",
+      "import": "./dist/embeddings/ollama.mjs"
+    },
+    "./embeddings/transformers": {
+      "types": "./dist/embeddings/transformers.d.mts",
+      "import": "./dist/embeddings/transformers.mjs"
+    },
+    "./embeddings/mistral": {
+      "types": "./dist/embeddings/mistral.d.mts",
+      "import": "./dist/embeddings/mistral.mjs"
+    },
+    "./embeddings/cohere": {
+      "types": "./dist/embeddings/cohere.d.mts",
+      "import": "./dist/embeddings/cohere.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -53,18 +82,42 @@
     "dev:prepare": "obuild --stub",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest",
+    "test": "vitest --project unit",
+    "test:eval": "vitest run --project eval",
     "test:attw": "attw --pack",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build",
+    "release": "pnpm build && bumpp --output=CHANGELOG.md"
   },
   "peerDependencies": {
+    "@ai-sdk/cohere": "^3.0.0",
+    "@ai-sdk/google": "^3.0.0",
+    "@ai-sdk/mistral": "^3.0.0",
+    "@ai-sdk/openai": "^3.0.0",
+    "@huggingface/transformers": "^3.0.0",
     "@libsql/client": "^0.14.0 || ^0.15.0 || ^0.16.0 || ^0.17.0",
     "@upstash/vector": "^1.0.0",
     "ai": "^4.0.0 || ^5.0.0 || ^6.0.0",
     "better-sqlite3": "^11.0.0 || ^12.0.0",
-    "pg": "^8.0.0"
+    "ollama-ai-provider-v2": "^1.0.0",
+    "pg": "^8.0.0",
+    "sqlite-vec": "^0.1.0-alpha.0"
   },
   "peerDependenciesMeta": {
+    "@ai-sdk/cohere": {
+      "optional": true
+    },
+    "@ai-sdk/google": {
+      "optional": true
+    },
+    "@ai-sdk/mistral": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    },
+    "@huggingface/transformers": {
+      "optional": true
+    },
     "@libsql/client": {
       "optional": true
     },
@@ -77,22 +130,40 @@
     "better-sqlite3": {
       "optional": true
     },
+    "ollama-ai-provider-v2": {
+      "optional": true
+    },
     "pg": {
+      "optional": true
+    },
+    "sqlite-vec": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@ai-sdk/cohere": "catalog:",
+    "@ai-sdk/google": "catalog:",
+    "@ai-sdk/mistral": "catalog:",
+    "@ai-sdk/openai": "catalog:",
     "@antfu/eslint-config": "catalog:",
     "@arethetypeswrong/cli": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@huggingface/transformers": "catalog:",
     "@libsql/client": "catalog:",
     "@types/better-sqlite3": "catalog:",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "@upstash/vector": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "ai": "catalog:",
     "better-sqlite3": "catalog:",
+    "bumpp": "catalog:",
     "eslint": "catalog:",
     "obuild": "catalog:",
+    "pg": "catalog:",
+    "sqlite-vec": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "zod": "catalog:"
   }
 }

@@ -5,13 +5,26 @@ export default defineBuildConfig({
     {
       type: 'bundle',
       input: [
+        // Core
         './src/index.ts',
-        './src/model.ts',
-        './src/drivers/sqlite-vec.ts',
-        './src/drivers/libsql.ts',
-        './src/drivers/upstash.ts',
-        './src/drivers/cloudflare.ts',
-        './src/drivers/pgvector.ts',
+        './src/retriv.ts',
+        './src/types.ts',
+        './src/utils/split-text.ts',
+        // DB drivers
+        './src/db/sqlite-vec.ts',
+        './src/db/sqlite-fts.ts',
+        './src/db/libsql.ts',
+        './src/db/upstash.ts',
+        './src/db/cloudflare.ts',
+        './src/db/pgvector.ts',
+        // Embeddings
+        './src/embeddings/openai.ts',
+        './src/embeddings/google.ts',
+        './src/embeddings/ollama.ts',
+        './src/embeddings/transformers.ts',
+        './src/embeddings/mistral.ts',
+        './src/embeddings/cohere.ts',
+        './src/embeddings/resolve.ts',
       ],
     },
   ],
