@@ -86,6 +86,10 @@
     "./chunkers/auto": {
       "types": "./dist/chunkers/auto.d.mts",
       "import": "./dist/chunkers/auto.mjs"
+    },
+    "./utils/code-tokenize": {
+      "types": "./dist/utils/code-tokenize.d.mts",
+      "import": "./dist/utils/code-tokenize.mjs"
     }
   },
   "main": "./dist/index.mjs",
