@@ -1,18 +1,28 @@
 <h1>retriv</h1>
 
-[![npm version][npm-version-src]][npm-version-href]
-[![npm downloads][npm-downloads-src]][npm-downloads-href]
-[![License][license-src]][license-href]
+[![npm version](https://img.shields.io/npm/v/retriv?color=yellow)](https://npmjs.com/package/retriv)
+[![npm downloads](https://img.shields.io/npm/dm/retriv?color=yellow)](https://npm.chart.dev/retriv)
+[![license](https://img.shields.io/github/license/harlan-zw/retriv?color=yellow)](https://github.com/harlan-zw/retriv/blob/main/LICENSE)
 
-> Hybrid search for code and documents. BM25 keyword + vector semantic search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) for [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) than single methods. Local first with cloud integrations.
+> Hybrid search for code and documents. [BM25](https://en.wikipedia.org/wiki/Okapi_BM25) keyword + vector semantic search with [Reciprocal Rank Fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) for [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) than single methods. Local first with cloud integrations.
 
-## Features
+## Why?
 
-- 🌳 AST-aware code chunking via [tree-sitter](https://tree-sitter.github.io/) (TypeScript, JavaScript)
-- 🔤 Automatic `camelCase`/`snake_case` query expansion for BM25
-- 📂 File-type routing — code and markdown indexed with the right strategy automatically
-- 🔍 Metadata filtering — narrow results by file type, path prefix, or any custom field
-- 🔌 Swappable backends (SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize)
+Most search tools force you to choose: keyword search (fast, exact matches) or vector search (semantic understanding). Neither alone is good enough for mixed codebases with both code and documentation.
+
+- **Keyword-only** misses semantic matches — searching "authentication" won't find `verifyCredentials()`
+- **Vector-only** misses exact identifiers — searching `getUserName` returns fuzzy matches instead of the function
+- **Code needs special handling** — `camelCase` and `snake_case` identifiers need tokenization, AST-aware chunking preserves function boundaries
+
+**Alternative approaches have trade-offs:**
+
+| Approach | Problem |
+|----------|---------|
+| Elasticsearch/Typesense | Heavy infrastructure for a search index |
+| Raw embeddings + [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity) | No keyword fallback, misses exact matches |
+| Custom [BM25](https://en.wikipedia.org/wiki/Okapi_BM25) + vector pipeline | Lots of glue code, score normalization headaches |
+
+**retriv solves this:** single `createRetriv()` call gives you hybrid search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), AST-aware code chunking, and automatic query expansion. Swap backends without changing your search code.
 
 <p align="center">
 <table>
@@ -23,6 +33,14 @@
 </tbody>
 </table>
 </p>
+
+## Features
+
+- 🌳 **AST-aware code chunking** — [tree-sitter](https://tree-sitter.github.io/) splits on function/class boundaries (TypeScript, JavaScript)
+- 🔤 **Automatic query expansion** — `camelCase`/`snake_case` identifiers tokenized for [BM25](https://en.wikipedia.org/wiki/Okapi_BM25)
+- 📂 **File-type routing** — code and markdown indexed with the right strategy automatically
+- 🔍 **Metadata filtering** — narrow results by file type, path prefix, or any custom field
+- 🔌 **Swappable backends** — SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
 
 ## Installation
 
@@ -66,7 +84,7 @@ const results = await search.search('password hashing')
 // ]
 ```
 
-Code identifiers are auto-expanded for BM25 (`getUserName` → `"get User Name getUserName"`):
+Code identifiers are auto-expanded for [BM25](https://en.wikipedia.org/wiki/Okapi_BM25) (`getUserName` → `"get User Name getUserName"`):
 
 ```ts
 await search.search('getUserName')
@@ -155,7 +173,7 @@ Search queries are automatically expanded for code identifier matching:
 | `React.useState` | `React use State useState` | dotted path + camelCase |
 | `how to get user` | `how to get user` | Natural language unchanged |
 
-This improves BM25 recall on code identifiers while being transparent for natural language queries.
+This improves [BM25](https://en.wikipedia.org/wiki/Okapi_BM25) recall on code identifiers while being transparent for natural language queries.
 
 Available standalone:
 
@@ -212,8 +230,8 @@ Multiple keys in a filter are ANDed together.
 
 | Driver | Strategy |
 |--------|----------|
-| SQLite hybrid | Native SQL — FTS5 `JOIN` + vec0 `rowid IN` subquery |
-| SQLite FTS5 | Native SQL — `JOIN` with metadata table |
+| SQLite hybrid | Native SQL — [FTS5](https://www.sqlite.org/fts5.html) `JOIN` + vec0 `rowid IN` subquery |
+| SQLite [FTS5](https://www.sqlite.org/fts5.html) | Native SQL — `JOIN` with metadata table |
 | sqlite-vec | Native SQL — `rowid IN` subquery |
 | pgvector | Native SQL — JSONB `WHERE` clauses |
 | LibSQL | Native SQL — `json_extract` `WHERE` clauses |
@@ -222,7 +240,7 @@ Multiple keys in a filter are ANDed together.
 
 ## Drivers
 
-### Hybrid (BM25 + Vector)
+### Hybrid ([BM25](https://en.wikipedia.org/wiki/Okapi_BM25) + Vector)
 
 | Driver | Import | Peer Dependencies |
 |--------|--------|-------------------|
@@ -238,11 +256,11 @@ Multiple keys in a filter are ANDed together.
 | pgvector | `retriv/db/pgvector` | `pg` |
 | sqlite-vec | `retriv/db/sqlite-vec` | `sqlite-vec` (Node.js >= 22.5) |
 
-### Keyword-Only (BM25)
+### Keyword-Only ([BM25](https://en.wikipedia.org/wiki/Okapi_BM25))
 
 | Driver | Import | Peer Dependencies |
 |--------|--------|-------------------|
-| SQLite FTS5 | `retriv/db/sqlite-fts` | `better-sqlite3` |
+| SQLite [FTS5](https://www.sqlite.org/fts5.html) | `retriv/db/sqlite-fts` | `better-sqlite3` |
 
 ## Embedding Providers
 
@@ -310,6 +328,11 @@ interface SearchResult {
 }
 ```
 
+## Related
+
+- [skilld](https://github.com/harlan-zw/skilld) — Generate agent skills from npm package docs, uses retriv for search
+- [code-chunk](https://github.com/nicolo-ribaudo/tree-sitter-js) — AST-aware code chunking via tree-sitter
+
 ## Sponsors
 
 <p align="center">
@@ -321,13 +344,3 @@ interface SearchResult {
 ## License
 
 Licensed under the [MIT license](https://github.com/harlan-zw/retriv/blob/main/LICENSE).
-
-<!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/retriv/latest.svg?style=flat&colorA=18181B&colorB=28CF8D
-[npm-version-href]: https://npmjs.com/package/retriv
-
-[npm-downloads-src]: https://img.shields.io/npm/dm/retriv.svg?style=flat&colorA=18181B&colorB=28CF8D
-[npm-downloads-href]: https://npmjs.com/package/retriv
-
-[license-src]: https://img.shields.io/github/license/harlan-zw/retriv.svg?style=flat&colorA=18181B&colorB=28CF8D
-[license-href]: https://github.com/harlan-zw/retriv/blob/main/LICENSE
