@@ -74,6 +74,14 @@
     "./embeddings/model-info": {
       "types": "./dist/embeddings/model-info.d.mts",
       "import": "./dist/embeddings/model-info.mjs"
+    },
+    "./chunkers/code": {
+      "types": "./dist/chunkers/code.d.mts",
+      "import": "./dist/chunkers/code.mjs"
+    },
+    "./chunkers/markdown": {
+      "types": "./dist/chunkers/markdown.d.mts",
+      "import": "./dist/chunkers/markdown.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -102,6 +110,7 @@
     "@libsql/client": "^0.14.0 || ^0.15.0 || ^0.16.0 || ^0.17.0",
     "@upstash/vector": "^1.0.0",
     "ai": "^4.0.0 || ^5.0.0 || ^6.0.0",
+    "code-chunk": "^0.1.0",
     "ollama-ai-provider-v2": "^1.0.0",
     "pg": "^8.0.0",
     "sqlite-vec": "^0.1.0-alpha.0"
@@ -131,6 +140,9 @@
     "ai": {
       "optional": true
     },
+    "code-chunk": {
+      "optional": true
+    },
     "ollama-ai-provider-v2": {
       "optional": true
     },
@@ -158,6 +170,7 @@
     "ai": "catalog:",
     "ai-sdk-provider-gemini-cli": "catalog:",
     "bumpp": "catalog:",
+    "code-chunk": "catalog:",
     "eslint": "catalog:",
     "obuild": "catalog:",
     "pg": "catalog:",
