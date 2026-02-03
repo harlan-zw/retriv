@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as sqliteVecExt from 'sqlite-vec'
 import { resolveEmbedding } from '../embeddings/resolve'
-import { matchesFilter } from '../filter'
+import { compileFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface SqliteVecConfig extends BaseDriverConfig {
@@ -135,26 +135,25 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
       }
 
       const queryEmbedding = new Float32Array(embedding)
-      const fetchLimit = filter ? limit * 4 : limit
+      const filterClause = compileFilter(filter, 'json')
+      const filterWhere = filterClause.sql
+        ? `AND rowid IN (SELECT rowid FROM vector_metadata WHERE ${filterClause.sql})`
+        : ''
 
       const vecResults = db.prepare(`
         SELECT rowid, distance
         FROM vectors
         WHERE embedding MATCH ?
+        ${filterWhere}
         ORDER BY distance
         LIMIT ?
-      `).all(queryEmbedding, fetchLimit) as Array<{ rowid: bigint, distance: number }>
+      `).all(queryEmbedding, ...filterClause.params, limit) as Array<{ rowid: bigint, distance: number }>
 
-      const mapped = vecResults.map((row) => {
+      return vecResults.map((row) => {
         const meta = db.prepare('SELECT id, content, metadata FROM vector_metadata WHERE rowid = ?')
           .get(row.rowid) as { id: string, content: string | null, metadata: string | null } | undefined
 
         if (!meta)
-          return null
-
-        const parsed = meta.metadata ? JSON.parse(meta.metadata) : undefined
-
-        if (filter && !matchesFilter(filter, parsed))
           return null
 
         const result: SearchResult = {
@@ -169,14 +168,11 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
             result._meta = { ...result._meta, highlights }
         }
 
-        if (returnMetadata && parsed) {
-          result.metadata = parsed
-        }
+        if (returnMetadata && meta.metadata)
+          result.metadata = JSON.parse(meta.metadata)
 
         return result
       }).filter(Boolean) as SearchResult[]
-
-      return mapped.slice(0, limit)
     },
 
     async remove(ids: string[]) {

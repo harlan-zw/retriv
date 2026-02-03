@@ -4,24 +4,30 @@ type FilterMode = 'json' | 'jsonb'
 
 interface CompiledFilter {
   sql: string
-  params: (string | number | boolean)[]
+  params: (string | number)[]
 }
 
 function isOperator(v: unknown): v is FilterOperator {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
-function fieldRef(field: string, mode: FilterMode): string {
+/** Convert boolean to 0/1 for SQL compatibility */
+function sqlVal(v: string | number | boolean): string | number {
+  return typeof v === 'boolean' ? (v ? 1 : 0) : v
+}
+
+function fieldRef(field: string, mode: FilterMode, table?: string): string {
+  const col = table ? `${table}.metadata` : 'metadata'
   return mode === 'json'
-    ? `json_extract(metadata, '$.${field}')`
-    : `metadata->>'${field}'`
+    ? `json_extract(${col}, '$.${field}')`
+    : `${col}->>'${field}'`
 }
 
 function compileOp(ref: string, op: FilterOperator): CompiledFilter {
   if ('$eq' in op)
-    return { sql: `${ref} = ?`, params: [op.$eq] }
+    return { sql: `${ref} = ?`, params: [sqlVal(op.$eq)] }
   if ('$ne' in op)
-    return { sql: `${ref} != ?`, params: [op.$ne] }
+    return { sql: `${ref} != ?`, params: [sqlVal(op.$ne)] }
   if ('$gt' in op)
     return { sql: `${ref} > ?`, params: [op.$gt] }
   if ('$gte' in op)
@@ -47,16 +53,17 @@ function compileOp(ref: string, op: FilterOperator): CompiledFilter {
 /**
  * Compile a SearchFilter to SQL WHERE clause fragments.
  * mode: 'json' for SQLite json_extract, 'jsonb' for PostgreSQL ->>
+ * table: optional table alias prefix for metadata column (e.g. 'meta' -> meta.metadata)
  */
-export function compileFilter(filter: SearchFilter | undefined, mode: FilterMode): CompiledFilter {
+export function compileFilter(filter: SearchFilter | undefined, mode: FilterMode, table?: string): CompiledFilter {
   if (!filter || Object.keys(filter).length === 0)
     return { sql: '', params: [] }
 
   const clauses: string[] = []
-  const params: (string | number | boolean)[] = []
+  const params: (string | number)[] = []
 
   for (const [field, value] of Object.entries(filter)) {
-    const ref = fieldRef(field, mode)
+    const ref = fieldRef(field, mode, table)
     if (isOperator(value)) {
       const compiled = compileOp(ref, value)
       clauses.push(compiled.sql)
@@ -65,7 +72,7 @@ export function compileFilter(filter: SearchFilter | undefined, mode: FilterMode
     else {
       // Exact match shorthand
       clauses.push(`${ref} = ?`)
-      params.push(value)
+      params.push(sqlVal(value))
     }
   }
 

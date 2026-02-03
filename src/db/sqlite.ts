@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as sqliteVecExt from 'sqlite-vec'
 import { resolveEmbedding } from '../embeddings/resolve'
-import { matchesFilter } from '../filter'
+import { compileFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
 const RRF_K = 60
@@ -190,19 +190,21 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
 
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
       const { limit = 10, returnContent = false, returnMetadata = true, filter } = options
-      const fetchLimit = filter ? limit * 4 : limit * 2
-      const needMetadata = returnMetadata || !!filter
+      const fetchLimit = limit * 2
+      const ftsFilter = compileFilter(filter, 'json', 'meta')
+      const vecFilter = compileFilter(filter, 'json')
 
-      // FTS5 search with header weighting (id:0, headers:2.0, content:1.0, metadata:0)
-      const ftsStmt = db.prepare(`
-        SELECT id, content, metadata, bm25(documents_fts, 0, 2.0, 1.0, 0) as score
-        FROM documents_fts
+      // FTS5 search — JOIN with documents_meta for native metadata filtering
+      const ftsFilterWhere = ftsFilter.sql ? `AND ${ftsFilter.sql}` : ''
+      const ftsRows = db.prepare(`
+        SELECT fts.id, meta.content, meta.metadata, bm25(documents_fts, 0, 2.0, 1.0, 0) as score
+        FROM documents_fts fts
+        INNER JOIN documents_meta meta ON fts.id = meta.id
         WHERE documents_fts MATCH ?
+        ${ftsFilterWhere}
         ORDER BY bm25(documents_fts, 0, 2.0, 1.0, 0)
         LIMIT ?
-      `)
-
-      const ftsRows = ftsStmt.all(query, fetchLimit) as Array<{
+      `).all(query, ...ftsFilter.params, fetchLimit) as Array<{
         id: string
         content: string | null
         metadata: string | null
@@ -220,25 +222,29 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
           if (highlights.length)
             result._meta = { ...result._meta, highlights }
         }
-        if (needMetadata && row.metadata)
+        if (returnMetadata && row.metadata)
           result.metadata = JSON.parse(row.metadata)
         return result
       })
 
-      // Vector search
+      // Vector search — rowid IN subquery for native metadata filtering
       const [embedding] = await embedder([query])
       if (!embedding)
         throw new Error('Failed to generate query embedding')
 
       const queryEmbedding = new Float32Array(embedding)
+      const vecFilterWhere = vecFilter.sql
+        ? `AND rowid IN (SELECT rowid FROM documents_meta WHERE ${vecFilter.sql})`
+        : ''
 
       const vecRows = db.prepare(`
         SELECT rowid, distance
         FROM documents_vec
         WHERE embedding MATCH ?
+        ${vecFilterWhere}
         ORDER BY distance
         LIMIT ?
-      `).all(queryEmbedding, fetchLimit) as Array<{ rowid: bigint, distance: number }>
+      `).all(queryEmbedding, ...vecFilter.params, fetchLimit) as Array<{ rowid: bigint, distance: number }>
 
       const vecResults: SearchResult[] = vecRows.map((row) => {
         const meta = db.prepare('SELECT id, content, metadata FROM documents_meta WHERE rowid = ?')
@@ -257,22 +263,13 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
           if (highlights.length)
             result._meta = { ...result._meta, highlights }
         }
-        if (needMetadata && meta.metadata)
+        if (returnMetadata && meta.metadata)
           result.metadata = JSON.parse(meta.metadata)
         return result
       }).filter(Boolean) as SearchResult[]
 
-      // RRF fusion
-      let merged = applyRRF(ftsResults, vecResults)
-
-      // Post-fusion metadata filtering
-      if (filter)
-        merged = merged.filter(r => matchesFilter(filter, r.metadata))
-
-      // Strip metadata if not requested (was only parsed for filtering)
-      if (!returnMetadata && filter)
-        merged = merged.map(({ metadata: _, ...rest }) => rest)
-
+      // RRF fusion — both sides already pre-filtered
+      const merged = applyRRF(ftsResults, vecResults)
       return merged.slice(0, limit)
     },
 
