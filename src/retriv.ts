@@ -1,4 +1,5 @@
 import type { ComposedDriver, Document, DriverInput, RetrivOptions, SearchOptions, SearchProvider, SearchResult } from './types'
+import { tokenizeCodeQuery } from './utils/code-tokenize'
 import { splitText } from './utils/split-text'
 
 const RRF_K = 60
@@ -146,13 +147,15 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
     },
 
     async search(query: string, searchOptions: SearchOptions = {}): Promise<SearchResult[]> {
+      const expandedQuery = tokenizeCodeQuery(query)
+
       if (!isHybrid) {
-        const results = await drivers[0].search(query, searchOptions)
+        const results = await drivers[0].search(expandedQuery, searchOptions)
         return annotateChunks(results)
       }
 
       const resultSets = await Promise.all(
-        drivers.map(d => d.search(query, searchOptions)),
+        drivers.map(d => d.search(expandedQuery, searchOptions)),
       )
 
       let merged = applyRRF(resultSets)

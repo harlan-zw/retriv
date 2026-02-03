@@ -4,7 +4,7 @@
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![License][license-src]][license-href]
 
-Index and retrieve Markdown documents with [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) using hybrid search.
+Index and retrieve Markdown and source code with [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) using hybrid search.
 
 Keyword search (BM25) finds exact matches but misses synonyms. Semantic search understands meaning but struggles with names, codes, and precise terminology. Hybrid search combines both using [Reciprocal Rank Fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) - [research shows up to 5.8x improvement](https://www.researchgate.net/publication/399428523_Hybrid_Dense-Sparse_Retrieval_for_High-Recall_Information_Retrieval) on standard benchmarks.
 
@@ -24,6 +24,7 @@ Keyword search (BM25) finds exact matches but misses synonyms. Semantic search u
 - 🔌 **[Swappable backends](#drivers)** - SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
 - 🧠 **[Any embedding provider](#embedding-providers)** - OpenAI, Google, Mistral, Cohere, Ollama, or local [Transformers.js](https://huggingface.co/docs/transformers.js)
 - ✂️ **[Automatic chunking](#with-chunking)** - Split large documents with configurable overlap
+- 🧑‍💻 **[Code search](#code-search)** - AST-aware chunking via tree-sitter with camelCase/snake_case tokenization
 - 📦 **[Unified interface](#api)** - Same `SearchProvider` API across all drivers
 
 ## Installation
@@ -152,6 +153,95 @@ await search.index([
 const results = await search.search('specific topic')
 // Results include _chunk: { parentId, index, range }
 ```
+
+### Code Search
+
+Index and search source code with AST-aware chunking. Supports TypeScript, JavaScript, Python, Rust, Go, and Java.
+
+```bash
+pnpm add code-chunk
+```
+
+```ts
+import { createRetriv } from 'retriv'
+import { codeChunker } from 'retriv/chunkers/code'
+import sqliteFts from 'retriv/db/sqlite-fts'
+
+const search = await createRetriv({
+  driver: sqliteFts({ path: './code.db' }),
+  chunking: {
+    chunker: await codeChunker(), // tree-sitter AST splitting
+  },
+})
+
+await search.index([
+  { id: 'src/auth.ts', content: authFileContents },
+  { id: 'src/api.ts', content: apiFileContents },
+])
+
+const results = await search.search('password hashing')
+```
+
+#### Mixed Codebases
+
+For projects with both code and documentation, the auto chunker routes by file extension:
+
+```ts
+import { autoChunker } from 'retriv/chunkers/auto'
+
+const search = await createRetriv({
+  driver: sqliteFts({ path: './search.db' }),
+  chunking: {
+    chunker: await autoChunker(), // .ts/.py → code chunker, .md → markdown chunker
+  },
+})
+
+await search.index([
+  { id: 'src/auth.ts', content: codeFile },
+  { id: 'docs/guide.md', content: markdownFile },
+])
+```
+
+Falls back to markdown chunking if `code-chunk` is not installed.
+
+#### Custom Chunker
+
+Pass any function matching the `Chunker` type:
+
+```ts
+import type { Chunker } from 'retriv'
+
+const myChunker: Chunker = (content, meta) => {
+  // Split however you like, return { text, range?, context? }[]
+  return [{ text: content }]
+}
+
+const search = await createRetriv({
+  driver: sqliteFts({ path: ':memory:' }),
+  chunking: { chunker: myChunker },
+})
+```
+
+#### Code Query Tokenization
+
+`createRetriv` automatically expands code identifiers in search queries for better BM25 matching — `getUserName` becomes `get User Name getUserName`, `MAX_RETRY_COUNT` becomes `MAX RETRY COUNT MAX_RETRY_COUNT`. This is a no-op on natural language queries.
+
+The tokenizer is also available standalone:
+
+```ts
+import { tokenizeCodeQuery } from 'retriv/utils/code-tokenize'
+
+tokenizeCodeQuery('getUserName') // → 'get User Name getUserName'
+tokenizeCodeQuery('how to get user') // → 'how to get user' (unchanged)
+```
+
+### Chunkers
+
+| Chunker | Import | Peer Dependencies |
+|---------|--------|-------------------|
+| Code | `retriv/chunkers/code` | `code-chunk` |
+| Markdown | `retriv/chunkers/markdown` | — |
+| Auto | `retriv/chunkers/auto` | `code-chunk` (optional) |
 
 ## Drivers
 
