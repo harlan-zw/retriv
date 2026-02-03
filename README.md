@@ -66,29 +66,6 @@ await search.search('getUserName')
 
 Chunking is enabled by default — `.ts`/`.py`/`.rs`/etc. route through tree-sitter AST splitting, `.md` through heading-aware markdown splitting. Query tokenization expands code identifiers automatically (no-op on natural language).
 
-### With Vector Embeddings (Hybrid)
-
-Add semantic search for synonym matching and meaning-based retrieval:
-
-```bash
-pnpm add retriv code-chunk @huggingface/transformers-js sqlite-vec
-```
-
-```ts
-import { createRetriv } from 'retriv'
-import sqlite from 'retriv/db/sqlite'
-import { transformers } from 'retriv/embeddings/transformers'
-
-const search = await createRetriv({
-  driver: sqlite({
-    path: './search.db',
-    embeddings: transformers(), // runs locally, no API key
-  }),
-})
-```
-
-BM25 finds `hashPassword` when you search "hash password". Vectors find it when you search "encrypt credentials". Hybrid finds it either way.
-
 ### Cloud Embeddings
 
 ```bash
