@@ -3,6 +3,8 @@ export { createRetriv } from './retriv'
 
 // Core types
 export type {
+  Chunker,
+  ChunkerChunk,
   ChunkInfo,
   ChunkingOptions,
   Document,

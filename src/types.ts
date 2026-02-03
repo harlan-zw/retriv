@@ -188,11 +188,29 @@ export interface TextNativeDriverConfig extends BaseDriverConfig {
 }
 
 /**
+ * A chunk produced by a chunker function
+ */
+export interface ChunkerChunk {
+  text: string
+  /** Character range [start, end] in original content */
+  range?: [number, number]
+  /** Optional context to prepend for embedding (file path, scope, imports) */
+  context?: string
+}
+
+/**
+ * Chunker function — takes content + optional metadata, returns chunks
+ */
+export type Chunker = (content: string, meta?: { id?: string, metadata?: Record<string, any> }) => ChunkerChunk[] | Promise<ChunkerChunk[]>
+
+/**
  * Chunking configuration
  */
 export interface ChunkingOptions {
   chunkSize?: number
   chunkOverlap?: number
+  /** Custom chunker function. Defaults to markdown-aware splitText. */
+  chunker?: Chunker
 }
 
 /**

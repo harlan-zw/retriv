@@ -153,6 +153,27 @@ Conclusion with final thoughts.`
     expect(results[0]!._meta?.highlights?.length).toBeGreaterThan(0)
   })
 
+  it('uses custom chunker when provided', async () => {
+    const content = 'The quick brown fox jumps over the lazy dog. Another sentence about testing custom chunkers.'
+    const customChunker = (text: string) => [
+      { text: text.slice(0, 45), range: [0, 45] as [number, number] },
+      { text: text.slice(45), range: [45, text.length] as [number, number] },
+    ]
+
+    const db = await createRetriv({
+      driver: sqliteFts({ path: ':memory:' }),
+      chunking: {
+        chunker: customChunker,
+      },
+    })
+
+    await db.index([{ id: 'doc1', content }])
+
+    const results = await db.search('chunkers', { returnMetadata: true })
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0]!._chunk).toBeDefined()
+  })
+
   // Composed drivers and hybrid sqlite tests are in test/e2e/retriv.test.ts
   // (they require embedding models which are slow to load)
 })

@@ -67,29 +67,40 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
   const isHybrid = drivers.length > 1
   const parentDocs = new Map<string, Document>()
 
-  function prepareDocs(docs: Document[]): Document[] {
+  async function prepareDocs(docs: Document[]): Promise<Document[]> {
     if (!chunking)
       return docs
 
-    const { chunkSize = 1000, chunkOverlap = 200 } = chunking
+    const { chunkSize = 1000, chunkOverlap = 200, chunker } = chunking
     const chunkedDocs: Document[] = []
 
     for (const doc of docs) {
-      const chunks = splitText(doc.content, { chunkSize, chunkOverlap })
+      let chunks: { text: string, range?: [number, number], context?: string }[]
 
-      if (chunks.length === 1) {
+      if (chunker) {
+        chunks = await chunker(doc.content, { id: doc.id, metadata: doc.metadata })
+      }
+      else {
+        chunks = splitText(doc.content, { chunkSize, chunkOverlap })
+      }
+
+      if (chunks.length <= 1) {
         chunkedDocs.push(doc)
       }
       else {
         parentDocs.set(doc.id, doc)
-        for (const chunk of chunks) {
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i]!
+          const content = chunk.context
+            ? `${chunk.context}\n${chunk.text}`
+            : chunk.text
           chunkedDocs.push({
-            id: `${doc.id}#chunk-${chunk.index}`,
-            content: chunk.text,
+            id: `${doc.id}#chunk-${i}`,
+            content,
             metadata: {
               ...doc.metadata,
               _parentId: doc.id,
-              _chunkIndex: chunk.index,
+              _chunkIndex: i,
               _chunkRange: chunk.range,
             },
           })
@@ -129,7 +140,7 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
 
   return {
     async index(docs: Document[]) {
-      const prepared = prepareDocs(docs)
+      const prepared = await prepareDocs(docs)
       const results = await Promise.all(drivers.map(d => d.index(prepared)))
       return { count: results[0].count }
     },
