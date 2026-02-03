@@ -38,8 +38,6 @@ pnpm add retriv code-chunk
 
 ## Quick Start
 
-Index code and markdown, search with natural language or code identifiers. File type is auto-detected from the document ID.
-
 ```ts
 import { createRetriv } from 'retriv'
 import sqlite from 'retriv/db/sqlite'
@@ -56,15 +54,26 @@ await search.index([
   { id: 'src/auth.ts', content: authFileContents },
   { id: 'docs/guide.md', content: guideContents },
 ])
-
-// Natural language
-await search.search('password hashing')
-
-// Code identifiers — auto-expanded: getUserName → "get User Name getUserName"
-await search.search('getUserName')
 ```
 
-Chunking is enabled by default — `.ts`/`.py`/`.rs`/etc. route through tree-sitter AST splitting, `.md` through heading-aware markdown splitting. Query tokenization expands code identifiers automatically (no-op on natural language).
+Natural language queries match semantically across both code and docs:
+
+```ts
+const results = await search.search('password hashing')
+// [
+//   { id: 'src/auth.ts#chunk-2', score: 0.82, _chunk: { parentId: 'src/auth.ts', index: 2 } },
+//   { id: 'docs/guide.md#chunk-0', score: 0.71, _chunk: { parentId: 'docs/guide.md', index: 0 } },
+// ]
+```
+
+Code identifiers are auto-expanded for BM25 (`getUserName` → `"get User Name getUserName"`):
+
+```ts
+await search.search('getUserName')
+// [
+//   { id: 'src/auth.ts#chunk-1', score: 0.91, _chunk: { parentId: 'src/auth.ts', index: 1 } },
+// ]
+```
 
 ### Cloud Embeddings
 
