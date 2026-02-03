@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as sqliteVecExt from 'sqlite-vec'
 import { resolveEmbedding } from '../embeddings/resolve'
+import { matchesFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface SqliteVecConfig extends BaseDriverConfig {
@@ -126,7 +127,7 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
     },
 
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
-      const { limit = 10, returnContent = false, returnMetadata = true } = options
+      const { limit = 10, returnContent = false, returnMetadata = true, filter } = options
 
       const [embedding] = await embedder([query])
       if (!embedding) {
@@ -134,6 +135,7 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
       }
 
       const queryEmbedding = new Float32Array(embedding)
+      const fetchLimit = filter ? limit * 4 : limit
 
       const vecResults = db.prepare(`
         SELECT rowid, distance
@@ -141,18 +143,22 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
         WHERE embedding MATCH ?
         ORDER BY distance
         LIMIT ?
-      `).all(queryEmbedding, limit) as Array<{ rowid: bigint, distance: number }>
+      `).all(queryEmbedding, fetchLimit) as Array<{ rowid: bigint, distance: number }>
 
-      return vecResults.map((row) => {
+      const mapped = vecResults.map((row) => {
         const meta = db.prepare('SELECT id, content, metadata FROM vector_metadata WHERE rowid = ?')
           .get(row.rowid) as { id: string, content: string | null, metadata: string | null } | undefined
 
         if (!meta)
           return null
 
+        const parsed = meta.metadata ? JSON.parse(meta.metadata) : undefined
+
+        if (filter && !matchesFilter(filter, parsed))
+          return null
+
         const result: SearchResult = {
           id: meta.id,
-          // L2 distance can be large, use 1/(1+d) for 0-1 normalization
           score: 1 / (1 + row.distance),
         }
 
@@ -163,12 +169,14 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
             result._meta = { ...result._meta, highlights }
         }
 
-        if (returnMetadata && meta.metadata) {
-          result.metadata = JSON.parse(meta.metadata)
+        if (returnMetadata && parsed) {
+          result.metadata = parsed
         }
 
         return result
       }).filter(Boolean) as SearchResult[]
+
+      return mapped.slice(0, limit)
     },
 
     async remove(ids: string[]) {

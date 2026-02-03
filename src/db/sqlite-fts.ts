@@ -1,6 +1,7 @@
 import type { BaseDriverConfig, Document, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { matchesFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface SqliteFtsConfig extends BaseDriverConfig {
@@ -66,7 +67,8 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
     },
 
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
-      const { limit = 10, returnContent = false, returnMetadata = true } = options
+      const { limit = 10, returnContent = false, returnMetadata = true, filter } = options
+      const needMetadata = returnMetadata || !!filter
 
       // Escape FTS5 special characters: " ( ) * : ^ -
       // and remove ? which isn't valid in FTS5 queries
@@ -78,12 +80,15 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
       if (!sanitized)
         return []
 
+      // Over-fetch when filtering since we filter post-query
+      const fetchLimit = filter ? limit * 4 : limit
+
       // Use BM25 ranking (built into FTS5)
       const stmt = db.prepare(`
         SELECT
           id,
           ${returnContent ? 'content,' : ''}
-          ${returnMetadata ? 'metadata,' : ''}
+          ${needMetadata ? 'metadata,' : ''}
           bm25(documents_fts) as score
         FROM documents_fts
         WHERE documents_fts MATCH ?
@@ -91,9 +96,9 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
         LIMIT ?
       `)
 
-      const rows = stmt.all(sanitized, limit) as any[]
+      const rows = stmt.all(sanitized, fetchLimit) as any[]
 
-      return rows.map((row) => {
+      let results = rows.map((row) => {
         // BM25 returns negative values, lower is better
         // Convert to 0-1 score where higher is better
         const normalizedScore = Math.max(0, Math.min(1, 1 / (1 + Math.abs(row.score))))
@@ -110,12 +115,20 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
             result._meta = { ...result._meta, highlights }
         }
 
-        if (returnMetadata && row.metadata) {
+        if (needMetadata && row.metadata) {
           result.metadata = JSON.parse(row.metadata)
         }
 
         return result
       })
+
+      if (filter) {
+        results = results.filter(r => matchesFilter(filter, r.metadata))
+        if (!returnMetadata)
+          results.forEach(r => delete r.metadata)
+      }
+
+      return results.slice(0, limit)
     },
 
     async remove(ids: string[]) {

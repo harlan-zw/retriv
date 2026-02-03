@@ -1,5 +1,6 @@
 import type { BaseDriverConfig, Document, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { Index } from '@upstash/vector'
+import { matchesFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface UpstashConfig extends BaseDriverConfig {
@@ -60,37 +61,43 @@ export async function upstash(config: UpstashConfig): Promise<SearchProvider> {
     },
 
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
-      const { limit = 10, returnContent = false, returnMetadata = true } = options
+      const { limit = 10, returnContent = false, returnMetadata = true, filter } = options
+      const fetchLimit = filter ? limit * 4 : limit
 
       const results = await index.query({
         data: query,
-        topK: limit,
+        topK: fetchLimit,
         includeMetadata: true,
         includeData: true,
       } as any, { namespace: ns })
 
-      return (results || []).map((m: any) => {
+      let mapped = (results || []).map((m: any) => {
+        const { _content, ...rest } = m.metadata || {}
         const result: SearchResult = {
           id: m.id,
           score: Math.max(0, Math.min(1, m.score)),
         }
 
-        if (returnContent && m.metadata?._content) {
-          const { snippet, highlights } = extractSnippet(m.metadata._content, query)
+        if (returnContent && _content) {
+          const { snippet, highlights } = extractSnippet(_content, query)
           result.content = snippet
           if (highlights.length)
             result._meta = { ...result._meta, highlights }
         }
 
-        if (returnMetadata && m.metadata) {
-          const { _content, ...rest } = m.metadata
-          if (Object.keys(rest).length > 0) {
-            result.metadata = rest
-          }
-        }
+        if (Object.keys(rest).length > 0)
+          result.metadata = rest
 
         return result
       })
+
+      if (filter)
+        mapped = mapped.filter(r => matchesFilter(filter, r.metadata))
+
+      if (!returnMetadata)
+        mapped.forEach((r) => { delete r.metadata })
+
+      return mapped.slice(0, limit)
     },
 
     async remove(ids: string[]) {

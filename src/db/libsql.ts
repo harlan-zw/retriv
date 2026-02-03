@@ -1,6 +1,7 @@
 import type { BaseDriverConfig, Document, EmbeddingConfig, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { createClient } from '@libsql/client'
 import { resolveEmbedding } from '../embeddings/resolve'
+import { compileFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface LibsqlConfig extends BaseDriverConfig {
@@ -88,7 +89,7 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
     },
 
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
-      const { limit = 10, returnContent = false, returnMetadata = true } = options
+      const { limit = 10, returnContent = false, returnMetadata = true, filter } = options
 
       const [embedding] = await embedder([query])
       if (!embedding) {
@@ -96,6 +97,8 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
       }
 
       const vectorStr = JSON.stringify(embedding)
+      const filterClause = filter ? compileFilter(filter, 'json') : { sql: '', params: [] }
+      const whereClause = filterClause.sql ? `WHERE ${filterClause.sql}` : ''
 
       const results = await client.execute({
         sql: `
@@ -105,10 +108,11 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
             metadata,
             vector_distance_cos(embedding, vector32(?)) as distance
           FROM vectors
+          ${whereClause}
           ORDER BY distance
           LIMIT ?
         `,
-        args: [vectorStr, limit],
+        args: [vectorStr, ...filterClause.params, limit],
       })
 
       return (results.rows || []).map((row: any) => {

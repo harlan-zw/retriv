@@ -1,6 +1,7 @@
 import type { BaseDriverConfig, Document, EmbeddingConfig, SearchOptions, SearchProvider, SearchResult } from '../types'
 import pg from 'pg'
 import { resolveEmbedding } from '../embeddings/resolve'
+import { compileFilter, pgParams } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface PgvectorConfig extends BaseDriverConfig {
@@ -100,7 +101,7 @@ export async function pgvector(config: PgvectorConfig): Promise<SearchProvider> 
     },
 
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
-      const { limit = 10, returnContent = false, returnMetadata = true } = options
+      const { limit = 10, returnContent = false, returnMetadata = true, filter } = options
 
       const [embedding] = await embedder([query])
       if (!embedding) {
@@ -109,12 +110,18 @@ export async function pgvector(config: PgvectorConfig): Promise<SearchProvider> 
 
       const vectorStr = `[${embedding.join(',')}]`
 
+      const filterClause = filter ? compileFilter(filter, 'jsonb') : { sql: '', params: [] }
+      const pgFilterSql = filterClause.sql ? pgParams(filterClause.sql, 2) : ''
+      const whereClause = pgFilterSql ? `WHERE ${pgFilterSql}` : ''
+      const limitParam = `$${filterClause.params.length + 2}`
+
       const result = await pool.query(
         `SELECT id, content, metadata, embedding ${distanceOp} $1::vector as distance
          FROM ${table}
+         ${whereClause}
          ORDER BY embedding ${distanceOp} $1::vector
-         LIMIT $2`,
-        [vectorStr, limit],
+         LIMIT ${limitParam}`,
+        [vectorStr, ...filterClause.params, limit],
       )
 
       return result.rows.map((row: any) => {

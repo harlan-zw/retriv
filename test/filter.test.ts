@@ -1,6 +1,17 @@
 import type { FilterValue, SearchFilter } from '../src/types'
 import { describe, expect, expectTypeOf, it } from 'vitest'
+import { sqlite } from '../src/db/sqlite'
+import { sqliteFts } from '../src/db/sqlite-fts'
+import { sqliteVec } from '../src/db/sqlite-vec'
 import { compileFilter, matchesFilter, pgParams } from '../src/filter'
+import { createRetriv } from '../src/retriv'
+
+const mockEmbeddings = {
+  resolve: async () => ({
+    embedder: async (texts: string[]) => texts.map(() => Array.from({ length: 3 }, () => Math.random())),
+    dimensions: 3,
+  }),
+}
 
 describe('searchFilter types', () => {
   it('filterValue accepts primitives and operators', () => {
@@ -241,5 +252,152 @@ describe('pgParams', () => {
 
   it('handles single placeholder', () => {
     expect(pgParams('x = ?', 5)).toBe('x = $5')
+  })
+})
+
+describe('sqlite-fts filter', () => {
+  it('filters by exact metadata match', async () => {
+    const db = await sqliteFts({ path: ':memory:' })
+    await db.index([
+      { id: '1', content: 'hello world', metadata: { type: 'markdown' } },
+      { id: '2', content: 'hello earth', metadata: { type: 'code' } },
+      { id: '3', content: 'hello mars', metadata: { type: 'markdown' } },
+    ])
+    const results = await db.search('hello', { filter: { type: 'markdown' }, returnMetadata: true })
+    expect(results).toHaveLength(2)
+    expect(results.every(r => r.metadata?.type === 'markdown')).toBe(true)
+    await db.close?.()
+  })
+
+  it('filters by $prefix', async () => {
+    const db = await sqliteFts({ path: ':memory:' })
+    await db.index([
+      { id: '1', content: 'guide intro', metadata: { source: 'docs/guide/intro.md' } },
+      { id: '2', content: 'guide api', metadata: { source: 'docs/api/ref.md' } },
+      { id: '3', content: 'guide src', metadata: { source: 'src/index.ts' } },
+    ])
+    const results = await db.search('guide', { filter: { source: { $prefix: 'docs/' } } })
+    expect(results).toHaveLength(2)
+    await db.close?.()
+  })
+
+  it('respects limit after filtering', async () => {
+    const db = await sqliteFts({ path: ':memory:' })
+    await db.index([
+      { id: '1', content: 'test alpha', metadata: { type: 'a' } },
+      { id: '2', content: 'test beta', metadata: { type: 'a' } },
+      { id: '3', content: 'test gamma', metadata: { type: 'a' } },
+      { id: '4', content: 'test delta', metadata: { type: 'b' } },
+    ])
+    const results = await db.search('test', { filter: { type: 'a' }, limit: 2 })
+    expect(results).toHaveLength(2)
+    await db.close?.()
+  })
+})
+
+describe('sqlite hybrid filter', () => {
+  it('filters by metadata after RRF fusion', async () => {
+    const db = await sqlite({ path: ':memory:', embeddings: mockEmbeddings })
+    await db.index([
+      { id: '1', content: 'machine learning intro', metadata: { type: 'docs' } },
+      { id: '2', content: 'machine learning advanced', metadata: { type: 'code' } },
+      { id: '3', content: 'machine learning basics', metadata: { type: 'docs' } },
+    ])
+    const results = await db.search('machine learning', { filter: { type: 'docs' }, returnMetadata: true })
+    expect(results.every(r => r.metadata?.type === 'docs')).toBe(true)
+    await db.close?.()
+  })
+})
+
+describe('pgvector filter (compile only)', () => {
+  it('compiles JSONB filter correctly', () => {
+    const { sql, params } = compileFilter(
+      { type: 'markdown', source: { $prefix: 'docs/' } },
+      'jsonb',
+    )
+    expect(sql).toContain('metadata->>\'type\' = ?')
+    expect(sql).toContain('metadata->>\'source\' LIKE ?')
+    expect(params).toEqual(['markdown', 'docs/%'])
+  })
+
+  it('converts placeholders to $N with pgParams', () => {
+    const { sql, params } = compileFilter(
+      { type: 'markdown', source: { $prefix: 'docs/' } },
+      'jsonb',
+    )
+    const pgSql = pgParams(sql, 2)
+    expect(pgSql).toContain('metadata->>\'type\' = $2')
+    expect(pgSql).toContain('metadata->>\'source\' LIKE $3')
+    expect(params).toEqual(['markdown', 'docs/%'])
+  })
+})
+
+describe('libsql filter (compile only)', () => {
+  it('compiles json filter for libsql', () => {
+    const { sql, params } = compileFilter({ type: 'markdown' }, 'json')
+    expect(sql).toContain('json_extract(metadata, \'$.type\') = ?')
+    expect(params).toEqual(['markdown'])
+  })
+})
+
+describe('sqlite-vec filter', () => {
+  it('filters by exact metadata match', async () => {
+    const db = await sqliteVec({ path: ':memory:', embeddings: mockEmbeddings })
+    await db.index([
+      { id: '1', content: 'hello world', metadata: { type: 'markdown' } },
+      { id: '2', content: 'hello earth', metadata: { type: 'code' } },
+      { id: '3', content: 'hello mars', metadata: { type: 'markdown' } },
+    ])
+    const results = await db.search('hello', { filter: { type: 'markdown' }, returnMetadata: true })
+    expect(results.every(r => r.metadata?.type === 'markdown')).toBe(true)
+    await db.close?.()
+  })
+
+  it('filters by $prefix', async () => {
+    const db = await sqliteVec({ path: ':memory:', embeddings: mockEmbeddings })
+    await db.index([
+      { id: '1', content: 'guide intro', metadata: { source: 'docs/guide/intro.md' } },
+      { id: '2', content: 'guide api', metadata: { source: 'docs/api/ref.md' } },
+      { id: '3', content: 'guide src', metadata: { source: 'src/index.ts' } },
+    ])
+    const results = await db.search('guide', { filter: { source: { $prefix: 'docs/' } } })
+    expect(results.every(r => r.id !== '3')).toBe(true)
+    await db.close?.()
+  })
+})
+
+describe('createRetriv filter', () => {
+  it('passes filter through to single driver', async () => {
+    const retriv = await createRetriv({
+      driver: sqliteFts({ path: ':memory:' }),
+    })
+    await retriv.index([
+      { id: '1', content: 'hello world', metadata: { type: 'docs' } },
+      { id: '2', content: 'hello mars', metadata: { type: 'code' } },
+    ])
+    const results = await retriv.search('hello', { filter: { type: 'docs' }, returnMetadata: true })
+    expect(results).toHaveLength(1)
+    expect(results[0]!.metadata?.type).toBe('docs')
+  })
+
+  it('filters work with chunking', async () => {
+    const retriv = await createRetriv({
+      driver: sqliteFts({ path: ':memory:' }),
+      chunking: { chunkSize: 30, chunkOverlap: 0 },
+    })
+    await retriv.index([
+      { id: 'doc1', content: 'First section content.\n\nSecond section content.', metadata: { type: 'docs' } },
+      { id: 'doc2', content: 'Third section content.\n\nFourth section content.', metadata: { type: 'code' } },
+    ])
+    const results = await retriv.search('section', { filter: { type: 'docs' }, returnMetadata: true })
+    // All results should be from doc1 (type: docs) — either chunks or the doc itself
+    for (const r of results) {
+      if (r._chunk) {
+        expect(r._chunk.parentId).toBe('doc1')
+      }
+      else {
+        expect(r.metadata?.type).toBe('docs')
+      }
+    }
   })
 })

@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import * as sqliteVecExt from 'sqlite-vec'
 import { resolveEmbedding } from '../embeddings/resolve'
+import { matchesFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
 const RRF_K = 60
@@ -188,7 +189,9 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
     },
 
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
-      const { limit = 10, returnContent = false, returnMetadata = true } = options
+      const { limit = 10, returnContent = false, returnMetadata = true, filter } = options
+      const fetchLimit = filter ? limit * 4 : limit * 2
+      const needMetadata = returnMetadata || !!filter
 
       // FTS5 search with header weighting (id:0, headers:2.0, content:1.0, metadata:0)
       const ftsStmt = db.prepare(`
@@ -199,7 +202,7 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
         LIMIT ?
       `)
 
-      const ftsRows = ftsStmt.all(query, limit * 2) as Array<{
+      const ftsRows = ftsStmt.all(query, fetchLimit) as Array<{
         id: string
         content: string | null
         metadata: string | null
@@ -217,7 +220,7 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
           if (highlights.length)
             result._meta = { ...result._meta, highlights }
         }
-        if (returnMetadata && row.metadata)
+        if (needMetadata && row.metadata)
           result.metadata = JSON.parse(row.metadata)
         return result
       })
@@ -235,7 +238,7 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
         WHERE embedding MATCH ?
         ORDER BY distance
         LIMIT ?
-      `).all(queryEmbedding, limit * 2) as Array<{ rowid: bigint, distance: number }>
+      `).all(queryEmbedding, fetchLimit) as Array<{ rowid: bigint, distance: number }>
 
       const vecResults: SearchResult[] = vecRows.map((row) => {
         const meta = db.prepare('SELECT id, content, metadata FROM documents_meta WHERE rowid = ?')
@@ -254,13 +257,22 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
           if (highlights.length)
             result._meta = { ...result._meta, highlights }
         }
-        if (returnMetadata && meta.metadata)
+        if (needMetadata && meta.metadata)
           result.metadata = JSON.parse(meta.metadata)
         return result
       }).filter(Boolean) as SearchResult[]
 
       // RRF fusion
-      const merged = applyRRF(ftsResults, vecResults)
+      let merged = applyRRF(ftsResults, vecResults)
+
+      // Post-fusion metadata filtering
+      if (filter)
+        merged = merged.filter(r => matchesFilter(filter, r.metadata))
+
+      // Strip metadata if not requested (was only parsed for filtering)
+      if (!returnMetadata && filter)
+        merged = merged.map(({ metadata: _, ...rest }) => rest)
+
       return merged.slice(0, limit)
     },
 
