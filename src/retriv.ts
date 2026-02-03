@@ -45,11 +45,11 @@ function applyRRF(resultSets: SearchResult[][]): SearchResult[] {
  * Create a unified retrieval instance
  */
 export async function createRetriv(options: RetrivOptions): Promise<SearchProvider> {
-  const { driver: driverInput, chunking } = options
+  const { driver: driverInput, chunking = {} } = options
 
   // Resolve default chunker — autoChunker routes code vs markdown by file extension
   let resolvedChunker: Chunker | undefined
-  if (chunking) {
+  if (chunking !== false) {
     resolvedChunker = chunking.chunker ?? await autoChunker({
       markdown: { chunkSize: chunking.chunkSize, chunkOverlap: chunking.chunkOverlap },
       code: {},

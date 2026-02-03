@@ -54,6 +54,9 @@ catalogs:
     bumpp:
       specifier: ^10.4.0
       version: 10.4.0
+    code-chunk:
+      specifier: ^0.1.13
+      version: 0.1.13
     eslint:
       specifier: ^9.39.2
       version: 9.39.2
@@ -133,7 +136,7 @@ importers:
         specifier: 'catalog:'
         version: 10.4.0(magicast@0.5.1)
       code-chunk:
-        specifier: ^0.1.13
+        specifier: 'catalog:'
         version: 0.1.13(typescript@5.9.3)
       eslint:
         specifier: 'catalog:'

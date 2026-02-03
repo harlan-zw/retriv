@@ -268,5 +268,6 @@ export type DriverInput = AnyDriver | ComposedDriver
  */
 export interface RetrivOptions {
   driver: DriverInput
-  chunking?: ChunkingOptions
+  /** Chunking config. Enabled by default. Pass `false` to disable. */
+  chunking?: ChunkingOptions | false
 }

@@ -4,12 +4,15 @@
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![License][license-src]][license-href]
 
-Hybrid search for code and documents. BM25 keyword + vector semantic search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) for [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) than single methods.
+> Hybrid search for code and documents. BM25 keyword + vector semantic search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) for [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) than single methods. Local first with cloud integrations.
 
-- AST-aware code chunking via [tree-sitter](https://tree-sitter.github.io/) (TypeScript, JavaScript)
-- Automatic `camelCase`/`snake_case` query expansion for BM25
-- File-type routing — code and markdown indexed with the right strategy automatically
-- Swappable backends (SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize)
+## Features
+
+- 🌳 AST-aware code chunking via [tree-sitter](https://tree-sitter.github.io/) (TypeScript, JavaScript)
+- 🔤 Automatic `camelCase`/`snake_case` query expansion for BM25
+- 📂 File-type routing — code and markdown indexed with the right strategy automatically
+- 🔍 Metadata filtering — narrow results by file type, path prefix, or any custom field
+- 🔌 Swappable backends (SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize)
 
 <p align="center">
 <table>
@@ -33,41 +36,42 @@ For code search (AST-aware chunking):
 pnpm add retriv code-chunk
 ```
 
-## Quick Start — Code Search
+## Quick Start
 
-Index source files, search with natural language or code identifiers. Chunking auto-detects file type from the document ID.
+Index code and markdown, search with natural language or code identifiers. File type is auto-detected from the document ID.
 
 ```ts
 import { createRetriv } from 'retriv'
-import sqliteFts from 'retriv/db/sqlite-fts'
+import sqlite from 'retriv/db/sqlite'
+import { transformers } from 'retriv/embeddings/transformers'
 
 const search = await createRetriv({
-  driver: sqliteFts({ path: './search.db' }),
-  chunking: {},
+  driver: sqlite({
+    path: './search.db',
+    embeddings: transformers(), // runs locally, no API key
+  }),
 })
 
 await search.index([
   { id: 'src/auth.ts', content: authFileContents },
-  { id: 'src/api.ts', content: apiFileContents },
   { id: 'docs/guide.md', content: guideContents },
 ])
 
-// Natural language — works across code and docs
+// Natural language
 await search.search('password hashing')
 
-// Code identifiers — auto-expanded for BM25
-// getUserName → searches for "get User Name getUserName"
+// Code identifiers — auto-expanded: getUserName → "get User Name getUserName"
 await search.search('getUserName')
 ```
 
-That's it. `chunking: {}` enables the auto chunker which routes `.ts`/`.py`/`.rs`/etc. through tree-sitter AST splitting and `.md` through heading-aware markdown splitting. Query tokenization expands code identifiers automatically (no-op on natural language).
+Chunking is enabled by default — `.ts`/`.py`/`.rs`/etc. route through tree-sitter AST splitting, `.md` through heading-aware markdown splitting. Query tokenization expands code identifiers automatically (no-op on natural language).
 
 ### With Vector Embeddings (Hybrid)
 
 Add semantic search for synonym matching and meaning-based retrieval:
 
 ```bash
-pnpm add retriv code-chunk @huggingface/transformers sqlite-vec
+pnpm add retriv code-chunk @huggingface/transformers-js sqlite-vec
 ```
 
 ```ts
@@ -80,7 +84,6 @@ const search = await createRetriv({
     path: './search.db',
     embeddings: transformers(), // runs locally, no API key
   }),
-  chunking: {},
 })
 ```
 
@@ -100,7 +103,6 @@ const search = await createRetriv({
     path: './search.db',
     embeddings: openai(), // uses OPENAI_API_KEY env
   }),
-  chunking: {},
 })
 ```
 
@@ -123,7 +125,6 @@ const search = await createRetriv({
     }),
     keyword: sqliteFts({ path: './search.db' }),
   },
-  chunking: {},
 })
 ```
 
@@ -131,7 +132,7 @@ const search = await createRetriv({
 
 ### Chunking
 
-When `chunking` is enabled, documents are split before indexing. The default auto chunker picks strategy by file extension:
+Chunking is enabled by default. Documents are split before indexing. Pass `chunking: false` to disable. The auto chunker picks strategy by file extension:
 
 | File type | Strategy | What it does |
 |-----------|----------|--------------|
@@ -176,6 +177,63 @@ Available standalone:
 import { tokenizeCodeQuery } from 'retriv/utils/code-tokenize'
 ```
 
+### Filtering
+
+Narrow search results by metadata using a MongoDB-style filter DSL. Filters are applied at the SQL level (not post-search), so you get exact result counts without over-fetching.
+
+```ts
+// Attach metadata when indexing
+await search.index([
+  { id: 'src/auth.ts', content: authCode, metadata: { type: 'code', lang: 'typescript' } },
+  { id: 'src/api.ts', content: apiCode, metadata: { type: 'code', lang: 'typescript' } },
+  { id: 'docs/guide.md', content: guide, metadata: { type: 'docs', category: 'guide' } },
+  { id: 'docs/api-ref.md', content: apiRef, metadata: { type: 'docs', category: 'reference' } },
+])
+
+// Search only code files
+await search.search('authentication', {
+  filter: { type: 'code' },
+})
+
+// Search only docs under a path prefix
+await search.search('authentication', {
+  filter: { type: 'docs', category: { $prefix: 'guide' } },
+})
+
+// Combine multiple conditions (AND)
+await search.search('handler', {
+  filter: { type: 'code', lang: { $in: ['typescript', 'javascript'] } },
+})
+```
+
+When chunking is enabled, chunks inherit their parent document's metadata — so filtering works on chunks too.
+
+#### Operators
+
+| Operator | Example | Description |
+|----------|---------|-------------|
+| exact match | `{ type: 'code' }` | Equals value |
+| `$eq` | `{ type: { $eq: 'code' } }` | Equals (explicit) |
+| `$ne` | `{ type: { $ne: 'draft' } }` | Not equals |
+| `$gt` `$gte` `$lt` `$lte` | `{ priority: { $gt: 5 } }` | Numeric comparisons |
+| `$in` | `{ lang: { $in: ['ts', 'js'] } }` | Value in list |
+| `$prefix` | `{ source: { $prefix: 'src/api/' } }` | String starts with |
+| `$exists` | `{ deprecated: { $exists: false } }` | Field presence check |
+
+Multiple keys in a filter are ANDed together.
+
+#### Per-driver implementation
+
+| Driver | Strategy |
+|--------|----------|
+| SQLite hybrid | Native SQL — FTS5 `JOIN` + vec0 `rowid IN` subquery |
+| SQLite FTS5 | Native SQL — `JOIN` with metadata table |
+| sqlite-vec | Native SQL — `rowid IN` subquery |
+| pgvector | Native SQL — JSONB `WHERE` clauses |
+| LibSQL | Native SQL — `json_extract` `WHERE` clauses |
+| Upstash | Post-search filtering (4x over-fetch) |
+| Cloudflare | Post-search filtering (4x over-fetch) |
+
 ## Drivers
 
 ### Hybrid (BM25 + Vector)
@@ -211,7 +269,7 @@ All vector drivers accept an `embeddings` config:
 | Mistral | `retriv/embeddings/mistral` | `@ai-sdk/mistral ai` |
 | Cohere | `retriv/embeddings/cohere` | `@ai-sdk/cohere ai` |
 | Ollama | `retriv/embeddings/ollama` | `ollama-ai-provider-v2 ai` |
-| Transformers | `retriv/embeddings/transformers` | `@huggingface/transformers` |
+| Transformers | `retriv/embeddings/transformers` | `@huggingface/transformers-js` |
 
 ```ts
 // Cloud (require API keys)
@@ -249,6 +307,7 @@ interface SearchOptions {
   returnContent?: boolean // Include original content in results
   returnMetadata?: boolean // Include metadata in results
   returnMeta?: boolean // Include driver-specific _meta
+  filter?: SearchFilter // Filter by metadata fields
 }
 ```
 
