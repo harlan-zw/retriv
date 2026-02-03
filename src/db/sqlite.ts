@@ -7,6 +7,20 @@ import { extractSnippet } from '../utils/extract-snippet'
 
 const RRF_K = 60
 
+/**
+ * Extract markdown headers from content
+ * Returns newline-joined header text (without # prefixes)
+ */
+function extractHeaders(content: string): string {
+  // Strip fenced code blocks to avoid false positives
+  const withoutCodeBlocks = content.replace(/```[\s\S]*?```/g, '')
+  return withoutCodeBlocks
+    .split('\n')
+    .filter(line => /^#{1,6}\s/.test(line))
+    .map(line => line.replace(/^#{1,6}\s+/, ''))
+    .join('\n')
+}
+
 export interface SqliteConfig {
   /** Path to SQLite database file. Use ':memory:' for in-memory. */
   path?: string
@@ -86,10 +100,11 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
 
   sqliteVecExt.load(db)
 
-  // FTS5 table for BM25 search
+  // FTS5 table for BM25 search (headers weighted higher)
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
       id,
+      headers,
       content,
       metadata,
       tokenize='porter unicode61'
@@ -128,11 +143,13 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
           const doc = docs[i]!
           const vector = embeddings[i]!
           const metadataJson = doc.metadata ? JSON.stringify(doc.metadata) : null
+          const headers = extractHeaders(doc.content)
 
           // FTS5: upsert
           db.prepare('DELETE FROM documents_fts WHERE id = ?').run(doc.id)
-          db.prepare('INSERT INTO documents_fts (id, content, metadata) VALUES (?, ?, ?)').run(
+          db.prepare('INSERT INTO documents_fts (id, headers, content, metadata) VALUES (?, ?, ?, ?)').run(
             doc.id,
+            headers,
             doc.content,
             metadataJson,
           )
@@ -173,12 +190,12 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
       const { limit = 10, returnContent = false, returnMetadata = true } = options
 
-      // FTS5 search
+      // FTS5 search with header weighting (id:0, headers:2.0, content:1.0, metadata:0)
       const ftsStmt = db.prepare(`
-        SELECT id, content, metadata, bm25(documents_fts) as score
+        SELECT id, content, metadata, bm25(documents_fts, 0, 2.0, 1.0, 0) as score
         FROM documents_fts
         WHERE documents_fts MATCH ?
-        ORDER BY bm25(documents_fts)
+        ORDER BY bm25(documents_fts, 0, 2.0, 1.0, 0)
         LIMIT ?
       `)
 

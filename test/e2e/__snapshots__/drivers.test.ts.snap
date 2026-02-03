@@ -5,7 +5,7 @@ exports[`snapshots > results for "components" 1`] = `
   "libsql": [
     {
       "id": "doc-225",
-      "preview": "onent } from '#components'  const MyButton = resolveComponent('MyButton') </scri",
+      "preview": "onent } from '#components'  const MyButton = resolveComponent('MyButton')",
       "score": "0.737",
     },
     {
@@ -15,51 +15,51 @@ exports[`snapshots > results for "components" 1`] = `
     },
     {
       "id": "doc-157",
-      "preview": "mount some component', async () => {   const component = await mountSuspended(So",
+      "preview": "import { expect, it } from 'vitest' // ---cut--- // tests/components/SomeCompone",
       "score": "0.711",
     },
     {
       "id": "doc-238",
-      "preview": "\` in the callback of the \`onMounted()\` hook. ::  ::read-more{to="https://nuxt.co",
+      "preview": "::  ::read-more{to="https://nuxt.com/docs/4.x/api/components/client-only"} You c",
       "score": "0.711",
     },
     {
       "id": "doc-223",
-      "preview": "://nuxt.com/docs/4.x/getting-started/assets"}   # components  Nuxt automatically",
+      "preview": "  # components  Nuxt automatically imports any components in this directory (alo",
       "score": "0.707",
     },
   ],
   "sqlite-fts": [
     {
       "id": "doc-234",
-      "preview": ">     <LazyMountainsList v-if="show" />     <button       v-if="!show"       @cl",
+      "preview": "## Custom Directories  By default, only the \`~/components\` directory is scanned.",
       "score": "0.445",
     },
     {
       "id": "doc-238",
-      "preview": "\` in the callback of the \`onMounted()\` hook. ::  ::read-more{to="https://nuxt.co",
+      "preview": "::  ::read-more{to="https://nuxt.com/docs/4.x/api/components/client-only"} You c",
       "score": "0.446",
     },
     {
       "id": "doc-237",
-      "preview": "\`extensions\` key:  \`\`\`ts [nuxt.config.ts] twoslash export default defineNuxtConf",
+      "preview": "\`\`\`ts [nuxt.config.ts] twoslash export default defineNuxtConfig({   components: ",
       "score": "0.447",
     },
     {
       "id": "doc-223",
-      "preview": "://nuxt.com/docs/4.x/getting-started/assets"}   # components  Nuxt automatically",
+      "preview": "  # components  Nuxt automatically imports any components in this directory (alo",
       "score": "0.449",
     },
     {
       "id": "doc-241",
-      "preview": "nd adds some extra overhead. ::  ::warning Most features for server-only compone",
+      "preview": " ::warning Most features for server-only components and island components, such ",
       "score": "0.449",
     },
   ],
   "sqlite-vec": [
     {
       "id": "doc-225",
-      "preview": "onent } from '#components'  const MyButton = resolveComponent('MyButton') </scri",
+      "preview": "onent } from '#components'  const MyButton = resolveComponent('MyButton')",
       "score": "0.580",
     },
     {
@@ -69,17 +69,17 @@ exports[`snapshots > results for "components" 1`] = `
     },
     {
       "id": "doc-157",
-      "preview": "mount some component', async () => {   const component = await mountSuspended(So",
+      "preview": "import { expect, it } from 'vitest' // ---cut--- // tests/components/SomeCompone",
       "score": "0.568",
     },
     {
       "id": "doc-238",
-      "preview": "\` in the callback of the \`onMounted()\` hook. ::  ::read-more{to="https://nuxt.co",
+      "preview": "::  ::read-more{to="https://nuxt.com/docs/4.x/api/components/client-only"} You c",
       "score": "0.568",
     },
     {
       "id": "doc-223",
-      "preview": "://nuxt.com/docs/4.x/getting-started/assets"}   # components  Nuxt automatically",
+      "preview": "  # components  Nuxt automatically imports any components in this directory (alo",
       "score": "0.566",
     },
   ],
@@ -101,7 +101,7 @@ exports[`snapshots > results for "routing" 1`] = `
     },
     {
       "id": "doc-488",
-      "preview": "# Custom Routing  ## Adding custom routes  In Nuxt, your routing is defined by t",
+      "preview": "# Custom Routing  ## Adding custom routes",
       "score": "0.705",
     },
     {
@@ -123,12 +123,12 @@ exports[`snapshots > results for "routing" 1`] = `
     },
     {
       "id": "doc-488",
-      "preview": "# Custom Routing  ## Adding custom routes  In Nuxt, your routing is defined by t",
+      "preview": "# Custom Routing  ## Adding custom routes",
       "score": "0.306",
     },
     {
       "id": "doc-270",
-      "preview": "[pages/parent/child.vue] twoslash <script setup lang="ts"> definePageMeta({   ke",
+      "preview": "\`\`\`  :link-example{to="https://nuxt.com/docs/4.x/examples/routing/pages"}  ## Ro",
       "score": "0.306",
     },
     {
@@ -155,7 +155,7 @@ exports[`snapshots > results for "routing" 1`] = `
     },
     {
       "id": "doc-488",
-      "preview": "# Custom Routing  ## Adding custom routes  In Nuxt, your routing is defined by t",
+      "preview": "# Custom Routing  ## Adding custom routes",
       "score": "0.566",
     },
     {
@@ -182,7 +182,7 @@ exports[`snapshots > results for "server" 1`] = `
     },
     {
       "id": "doc-125",
-      "preview": "# Server  :read-more{to="https://nuxt.com/docs/4.x/directory-structure/server"} ",
+      "preview": "# Server  :read-more{to="https://nuxt.com/docs/4.x/directory-structure/server"}",
       "score": "0.743",
     },
     {
@@ -192,29 +192,29 @@ exports[`snapshots > results for "server" 1`] = `
     },
     {
       "id": "doc-347",
-      "preview": "tory are served at the root and are not modified by the build process.  This is ",
+      "preview": "This is suitable for files that have to keep their names (e.g. \`robots.txt\`) *or",
       "score": "0.697",
     },
     {
       "id": "doc-310",
-      "preview": "x22;"}.  ::note Note that currently server routes do not support the full functi",
+      "preview": " ::note Note that currently server routes do not support the full functionality ",
       "score": "0.697",
     },
   ],
   "sqlite-fts": [
     {
       "id": "doc-347",
-      "preview": "tory are served at the root and are not modified by the build process.  This is ",
+      "preview": "This is suitable for files that have to keep their names (e.g. \`robots.txt\`) *or",
       "score": "0.532",
     },
     {
       "id": "doc-312",
-      "preview": "response }     } catch (err) {       // Error handling       return { err }     ",
+      "preview": "\`\`\`  \`\`\`ts [server/api/hello.get.ts] export default defineWrappedResponseHandler",
       "score": "0.535",
     },
     {
       "id": "doc-474",
-      "preview": "# node type context ---| runtime/   # app type context ------| augments.app.d.ts",
+      "preview": "---| runtime/   # app type context ------| augments.app.d.ts ------| server/ # s",
       "score": "0.538",
     },
     {
@@ -236,7 +236,7 @@ exports[`snapshots > results for "server" 1`] = `
     },
     {
       "id": "doc-125",
-      "preview": "# Server  :read-more{to="https://nuxt.com/docs/4.x/directory-structure/server"} ",
+      "preview": "# Server  :read-more{to="https://nuxt.com/docs/4.x/directory-structure/server"}",
       "score": "0.582",
     },
     {
@@ -246,12 +246,12 @@ exports[`snapshots > results for "server" 1`] = `
     },
     {
       "id": "doc-347",
-      "preview": "tory are served at the root and are not modified by the build process.  This is ",
+      "preview": "This is suitable for files that have to keep their names (e.g. \`robots.txt\`) *or",
       "score": "0.562",
     },
     {
       "id": "doc-310",
-      "preview": "x22;"}.  ::note Note that currently server routes do not support the full functi",
+      "preview": " ::note Note that currently server routes do not support the full functionality ",
       "score": "0.562",
     },
   ],
@@ -268,7 +268,7 @@ exports[`snapshots > results for "state management" 1`] = `
     },
     {
       "id": "doc-112",
-      "preview": "t>  <template>   <p>Current color: {{ color }}</p> </template> \`\`\`  :video-accor",
+      "preview": "## Using third-party libraries  Nuxt **used to rely** on the Vuex library to pro",
       "score": "0.640",
     },
     {
@@ -278,7 +278,7 @@ exports[`snapshots > results for "state management" 1`] = `
     },
     {
       "id": "doc-107",
-      "preview": ""https://nuxt.com/docs/4.x/examples/features/state-management"}  ::note To globa",
+      "preview": ""https://nuxt.com/docs/4.x/examples/features/state-management"}  ::note",
       "score": "0.625",
     },
     {
@@ -290,17 +290,17 @@ exports[`snapshots > results for "state management" 1`] = `
   "sqlite-fts": [
     {
       "id": "doc-112",
-      "preview": "t>  <template>   <p>Current color: {{ color }}</p> </template> \`\`\`  :video-accor",
+      "preview": "## Using third-party libraries  Nuxt **used to rely** on the Vuex library to pro",
       "score": "0.085",
     },
     {
       "id": "doc-106",
-      "preview": ")\` would result in state shared across requests on the server and can lead to me",
+      "preview": "\`\`\`  :link-example{to="https://nuxt.com/docs/4.x/examples/features/state-managem",
       "score": "0.093",
     },
     {
       "id": "doc-107",
-      "preview": ""https://nuxt.com/docs/4.x/examples/features/state-management"}  ::note To globa",
+      "preview": ""https://nuxt.com/docs/4.x/examples/features/state-management"}  ::note",
       "score": "0.097",
     },
     {
@@ -310,7 +310,7 @@ exports[`snapshots > results for "state management" 1`] = `
     },
     {
       "id": "doc-111",
-      "preview": ":key="loc"         :value="loc"       >         {{ loc }}       </option>     </",
+      "preview": ":link-example{to="https://nuxt.com/docs/4.x/examples/advanced/locale"}  ## Share",
       "score": "0.105",
     },
   ],
@@ -322,7 +322,7 @@ exports[`snapshots > results for "state management" 1`] = `
     },
     {
       "id": "doc-112",
-      "preview": "t>  <template>   <p>Current color: {{ color }}</p> </template> \`\`\`  :video-accor",
+      "preview": "## Using third-party libraries  Nuxt **used to rely** on the Vuex library to pro",
       "score": "0.541",
     },
     {
@@ -332,7 +332,7 @@ exports[`snapshots > results for "state management" 1`] = `
     },
     {
       "id": "doc-107",
-      "preview": ""https://nuxt.com/docs/4.x/examples/features/state-management"}  ::note To globa",
+      "preview": ""https://nuxt.com/docs/4.x/examples/features/state-management"}  ::note",
       "score": "0.536",
     },
     {
