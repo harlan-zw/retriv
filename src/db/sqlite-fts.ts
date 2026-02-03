@@ -1,7 +1,7 @@
 import type { BaseDriverConfig, Document, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { matchesFilter } from '../filter'
+import { compileFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface SqliteFtsConfig extends BaseDriverConfig {
@@ -40,8 +40,16 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
     CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
       id,
       content,
-      metadata,
       tokenize='porter unicode61'
+    )
+  `)
+
+  // Metadata table for filtering (json_extract works on regular tables)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS documents_meta (
+      id TEXT PRIMARY KEY,
+      content TEXT,
+      metadata TEXT
     )
   `)
 
@@ -50,11 +58,20 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
       db.prepare('BEGIN').run()
       try {
         for (const doc of docs) {
+          const metadataJson = doc.metadata ? JSON.stringify(doc.metadata) : null
+
+          // FTS5: upsert
           db.prepare('DELETE FROM documents_fts WHERE id = ?').run(doc.id)
-          db.prepare('INSERT INTO documents_fts (id, content, metadata) VALUES (?, ?, ?)').run(
+          db.prepare('INSERT INTO documents_fts (id, content) VALUES (?, ?)').run(
             doc.id,
             doc.content,
-            doc.metadata ? JSON.stringify(doc.metadata) : null,
+          )
+
+          // Metadata: upsert
+          db.prepare('INSERT OR REPLACE INTO documents_meta (id, content, metadata) VALUES (?, ?, ?)').run(
+            doc.id,
+            doc.content,
+            metadataJson,
           )
         }
         db.prepare('COMMIT').run()
@@ -68,7 +85,6 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
 
     async search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
       const { limit = 10, returnContent = false, returnMetadata = true, filter } = options
-      const needMetadata = returnMetadata || !!filter
 
       // Escape FTS5 special characters: " ( ) * : ^ -
       // and remove ? which isn't valid in FTS5 queries
@@ -80,27 +96,25 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
       if (!sanitized)
         return []
 
-      // Over-fetch when filtering since we filter post-query
-      const fetchLimit = filter ? limit * 4 : limit
+      const filterClause = compileFilter(filter, 'json', 'meta')
+      const filterWhere = filterClause.sql ? `AND ${filterClause.sql}` : ''
 
-      // Use BM25 ranking (built into FTS5)
-      const stmt = db.prepare(`
-        SELECT
-          id,
-          ${returnContent ? 'content,' : ''}
-          ${needMetadata ? 'metadata,' : ''}
-          bm25(documents_fts) as score
-        FROM documents_fts
+      const rows = db.prepare(`
+        SELECT fts.id, meta.content, meta.metadata, bm25(documents_fts) as score
+        FROM documents_fts fts
+        INNER JOIN documents_meta meta ON fts.id = meta.id
         WHERE documents_fts MATCH ?
+        ${filterWhere}
         ORDER BY bm25(documents_fts)
         LIMIT ?
-      `)
+      `).all(sanitized, ...filterClause.params, limit) as Array<{
+        id: string
+        content: string | null
+        metadata: string | null
+        score: number
+      }>
 
-      const rows = stmt.all(sanitized, fetchLimit) as any[]
-
-      let results = rows.map((row) => {
-        // BM25 returns negative values, lower is better
-        // Convert to 0-1 score where higher is better
+      return rows.map((row) => {
         const normalizedScore = Math.max(0, Math.min(1, 1 / (1 + Math.abs(row.score))))
 
         const result: SearchResult = {
@@ -115,20 +129,11 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
             result._meta = { ...result._meta, highlights }
         }
 
-        if (needMetadata && row.metadata) {
+        if (returnMetadata && row.metadata)
           result.metadata = JSON.parse(row.metadata)
-        }
 
         return result
       })
-
-      if (filter) {
-        results = results.filter(r => matchesFilter(filter, r.metadata))
-        if (!returnMetadata)
-          results.forEach(r => delete r.metadata)
-      }
-
-      return results.slice(0, limit)
     },
 
     async remove(ids: string[]) {
@@ -136,6 +141,7 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
       try {
         for (const id of ids) {
           db.prepare('DELETE FROM documents_fts WHERE id = ?').run(id)
+          db.prepare('DELETE FROM documents_meta WHERE id = ?').run(id)
         }
         db.prepare('COMMIT').run()
         return { count: ids.length }
@@ -148,6 +154,7 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
 
     async clear() {
       db.exec('DELETE FROM documents_fts')
+      db.exec('DELETE FROM documents_meta')
     },
 
     async close() {
