@@ -25,7 +25,6 @@ describe('searchFilter types', () => {
   })
 
   it('searchFilter is assignable from concrete filters', () => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const filters: SearchFilter[] = [
       { category: 'blog' },
       { score: { $gt: 5 } },

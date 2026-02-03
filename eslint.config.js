@@ -7,6 +7,13 @@ export default antfu({
     'node/prefer-global/buffer': 'off',
   },
 }, {
+  ignores: ['docs/**'],
+}, {
+  files: ['**/*.md/**'],
+  rules: {
+    'style/max-statements-per-line': 'off',
+  },
+}, {
   files: ['**/test/**/*.ts', '**/test/**/*.js'],
   rules: {
     'ts/no-unsafe-function-type': 'off',
