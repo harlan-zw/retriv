@@ -82,6 +82,10 @@
     "./chunkers/markdown": {
       "types": "./dist/chunkers/markdown.d.mts",
       "import": "./dist/chunkers/markdown.mjs"
+    },
+    "./chunkers/auto": {
+      "types": "./dist/chunkers/auto.d.mts",
+      "import": "./dist/chunkers/auto.mjs"
     }
   },
   "main": "./dist/index.mjs",
