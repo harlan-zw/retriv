@@ -12,20 +12,11 @@ describe('detectContentType', () => {
     expect(detectContentType('App.jsx')).toBe('code')
   })
 
-  it('detects Python files', () => {
-    expect(detectContentType('main.py')).toBe('code')
-  })
-
-  it('detects Rust files', () => {
-    expect(detectContentType('lib.rs')).toBe('code')
-  })
-
-  it('detects Go files', () => {
-    expect(detectContentType('main.go')).toBe('code')
-  })
-
-  it('detects Java files', () => {
-    expect(detectContentType('App.java')).toBe('code')
+  it('treats other languages as markdown', () => {
+    expect(detectContentType('main.py')).toBe('markdown')
+    expect(detectContentType('lib.rs')).toBe('markdown')
+    expect(detectContentType('main.go')).toBe('markdown')
+    expect(detectContentType('App.java')).toBe('markdown')
   })
 
   it('detects markdown files', () => {

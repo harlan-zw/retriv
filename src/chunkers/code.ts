@@ -13,7 +13,7 @@ export interface CodeChunkerOptions {
  * Create a code-aware chunker using tree-sitter AST parsing.
  * Requires `code-chunk` package: `pnpm add code-chunk`
  *
- * Supports: TypeScript, JavaScript, Python, Rust, Go, Java
+ * Supports: TypeScript, JavaScript
  */
 export async function codeChunker(options: CodeChunkerOptions = {}): Promise<Chunker> {
   const {

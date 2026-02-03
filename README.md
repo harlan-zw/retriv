@@ -6,7 +6,7 @@
 
 Hybrid search for code and documents. BM25 keyword + vector semantic search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) for [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) than single methods.
 
-- AST-aware code chunking via [tree-sitter](https://tree-sitter.github.io/) (TypeScript, JavaScript, Python, Rust, Go, Java)
+- AST-aware code chunking via [tree-sitter](https://tree-sitter.github.io/) (TypeScript, JavaScript)
 - Automatic `camelCase`/`snake_case` query expansion for BM25
 - File-type routing — code and markdown indexed with the right strategy automatically
 - Swappable backends (SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize)
@@ -135,7 +135,7 @@ When `chunking` is enabled, documents are split before indexing. The default aut
 
 | File type | Strategy | What it does |
 |-----------|----------|--------------|
-| `.ts` `.js` `.py` `.rs` `.go` `.java` | tree-sitter AST | Splits on function/class boundaries, preserves scope context |
+| `.ts` `.tsx` `.js` `.jsx` `.mjs` `.mts` `.cjs` `.cts` | tree-sitter AST | Splits on function/class boundaries, preserves scope context |
 | `.md` `.mdx` | Heading-aware | Splits on headings with configurable overlap |
 | Everything else | Heading-aware | Falls back to markdown-style splitting |
 
