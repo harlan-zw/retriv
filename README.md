@@ -4,9 +4,12 @@
 [![npm downloads][npm-downloads-src]][npm-downloads-href]
 [![License][license-src]][license-href]
 
-Index and retrieve Markdown and source code with [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) using hybrid search.
+Hybrid search for code and documents. BM25 keyword + vector semantic search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) for [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) than single methods.
 
-Keyword search (BM25) finds exact matches but misses synonyms. Semantic search understands meaning but struggles with names, codes, and precise terminology. Hybrid search combines both using [Reciprocal Rank Fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) - [research shows up to 5.8x improvement](https://www.researchgate.net/publication/399428523_Hybrid_Dense-Sparse_Retrieval_for_High-Recall_Information_Retrieval) on standard benchmarks.
+- AST-aware code chunking via [tree-sitter](https://tree-sitter.github.io/) (TypeScript, JavaScript, Python, Rust, Go, Java)
+- Automatic `camelCase`/`snake_case` query expansion for BM25
+- File-type routing — code and markdown indexed with the right strategy automatically
+- Swappable backends (SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize)
 
 <p align="center">
 <table>
@@ -18,29 +21,53 @@ Keyword search (BM25) finds exact matches but misses synonyms. Semantic search u
 </table>
 </p>
 
-## Features
-
-- 🔀 **[Hybrid search](#local-first-sqlite)** - BM25 + vectors with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) in a single SQLite file
-- 🔌 **[Swappable backends](#drivers)** - SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
-- 🧠 **[Any embedding provider](#embedding-providers)** - OpenAI, Google, Mistral, Cohere, Ollama, or local [Transformers.js](https://huggingface.co/docs/transformers.js)
-- ✂️ **[Automatic chunking](#with-chunking)** - Split large documents with configurable overlap
-- 🧑‍💻 **[Code search](#code-search)** - AST-aware chunking via tree-sitter with camelCase/snake_case tokenization
-- 📦 **[Unified interface](#api)** - Same `SearchProvider` API across all drivers
-
 ## Installation
 
 ```bash
 pnpm add retriv
 ```
 
-## Usage
-
-### Local-First (SQLite)
-
-Single file with BM25 + vector search. No external services needed.
+For code search (AST-aware chunking):
 
 ```bash
-pnpm add @huggingface/transformers sqlite-vec
+pnpm add retriv code-chunk
+```
+
+## Quick Start — Code Search
+
+Index source files, search with natural language or code identifiers. Chunking auto-detects file type from the document ID.
+
+```ts
+import { createRetriv } from 'retriv'
+import sqliteFts from 'retriv/db/sqlite-fts'
+
+const search = await createRetriv({
+  driver: sqliteFts({ path: './search.db' }),
+  chunking: {},
+})
+
+await search.index([
+  { id: 'src/auth.ts', content: authFileContents },
+  { id: 'src/api.ts', content: apiFileContents },
+  { id: 'docs/guide.md', content: guideContents },
+])
+
+// Natural language — works across code and docs
+await search.search('password hashing')
+
+// Code identifiers — auto-expanded for BM25
+// getUserName → searches for "get User Name getUserName"
+await search.search('getUserName')
+```
+
+That's it. `chunking: {}` enables the auto chunker which routes `.ts`/`.py`/`.rs`/etc. through tree-sitter AST splitting and `.md` through heading-aware markdown splitting. Query tokenization expands code identifiers automatically (no-op on natural language).
+
+### With Vector Embeddings (Hybrid)
+
+Add semantic search for synonym matching and meaning-based retrieval:
+
+```bash
+pnpm add retriv code-chunk @huggingface/transformers sqlite-vec
 ```
 
 ```ts
@@ -53,37 +80,19 @@ const search = await createRetriv({
     path: './search.db',
     embeddings: transformers(), // runs locally, no API key
   }),
+  chunking: {},
 })
-
-await search.index([
-  {
-    id: '1',
-    content: 'How to mass delete Gmail emails using filters',
-    metadata: { source: 'https://support.google.com/mail', title: 'Gmail Help' },
-  },
-  {
-    id: '2',
-    content: 'Setting up email forwarding rules in Outlook',
-    metadata: { source: 'https://support.microsoft.com', title: 'Outlook Help' },
-  },
-])
-
-const results = await search.search('bulk remove messages', { returnMetadata: true })
-// Finds #1 via semantic similarity even without keyword overlap
-// results[0].metadata.source → 'https://support.google.com/mail'
 ```
 
-### Swap to Cloud Embeddings
+BM25 finds `hashPassword` when you search "hash password". Vectors find it when you search "encrypt credentials". Hybrid finds it either way.
 
-Same hybrid driver, better embeddings:
+### Cloud Embeddings
 
 ```bash
 pnpm add @ai-sdk/openai ai sqlite-vec
 ```
 
 ```ts
-import { createRetriv } from 'retriv'
-import sqlite from 'retriv/db/sqlite'
 import { openai } from 'retriv/embeddings/openai'
 
 const search = await createRetriv({
@@ -91,16 +100,13 @@ const search = await createRetriv({
     path: './search.db',
     embeddings: openai(), // uses OPENAI_API_KEY env
   }),
+  chunking: {},
 })
 ```
 
-### Swap to Cloud Vector DB
+### Cloud Vector DB
 
-For serverless or edge deployments:
-
-```bash
-pnpm add @libsql/client better-sqlite3 @ai-sdk/openai ai
-```
+For serverless or edge deployments, compose separate vector and keyword drivers:
 
 ```ts
 import { createRetriv } from 'retriv'
@@ -110,148 +116,75 @@ import { openai } from 'retriv/embeddings/openai'
 
 const search = await createRetriv({
   driver: {
-    // Turso for vectors
     vector: libsql({
       url: 'libsql://your-db.turso.io',
       authToken: process.env.TURSO_AUTH_TOKEN,
       embeddings: openai(),
     }),
-    // Local SQLite for BM25
     keyword: sqliteFts({ path: './search.db' }),
   },
+  chunking: {},
 })
 ```
 
-### With Chunking
+## How It Works
 
-Automatically split large documents:
+### Chunking
 
-```bash
-pnpm add @huggingface/transformers sqlite-vec
-```
+When `chunking` is enabled, documents are split before indexing. The default auto chunker picks strategy by file extension:
 
-```ts
-import { createRetriv } from 'retriv'
-import sqlite from 'retriv/db/sqlite'
-import { transformers } from 'retriv/embeddings/transformers'
+| File type | Strategy | What it does |
+|-----------|----------|--------------|
+| `.ts` `.js` `.py` `.rs` `.go` `.java` | tree-sitter AST | Splits on function/class boundaries, preserves scope context |
+| `.md` `.mdx` | Heading-aware | Splits on headings with configurable overlap |
+| Everything else | Heading-aware | Falls back to markdown-style splitting |
 
-const search = await createRetriv({
-  driver: sqlite({
-    path: './search.db',
-    embeddings: transformers(),
-  }),
-  chunking: {
-    chunkSize: 1000,
-    chunkOverlap: 200,
-  },
-})
+If `code-chunk` is not installed, code files fall back to markdown-style splitting.
 
-await search.index([
-  { id: 'doc-1', content: veryLongArticle },
-])
-
-const results = await search.search('specific topic')
-// Results include _chunk: { parentId, index, range }
-```
-
-### Code Search
-
-Index and search source code with AST-aware chunking. Supports TypeScript, JavaScript, Python, Rust, Go, and Java.
-
-```bash
-pnpm add code-chunk
-```
+Override with a specific chunker:
 
 ```ts
-import { createRetriv } from 'retriv'
 import { codeChunker } from 'retriv/chunkers/code'
-import sqliteFts from 'retriv/db/sqlite-fts'
+import { markdownChunker } from 'retriv/chunkers/markdown'
 
-const search = await createRetriv({
-  driver: sqliteFts({ path: './code.db' }),
-  chunking: {
-    chunker: await codeChunker(), // tree-sitter AST splitting
-  },
-})
+// Code only
+chunking: { chunker: await codeChunker({ maxChunkSize: 2000 }) }
 
-await search.index([
-  { id: 'src/auth.ts', content: authFileContents },
-  { id: 'src/api.ts', content: apiFileContents },
-])
+// Markdown only with custom sizes
+chunking: { chunker: markdownChunker({ chunkSize: 500, chunkOverlap: 100 }) }
 
-const results = await search.search('password hashing')
+// Or pass any function matching the Chunker type
+chunking: { chunker: (content, meta) => [{ text: content }] }
 ```
 
-#### Mixed Codebases
+### Query Tokenization
 
-For projects with both code and documentation, the auto chunker routes by file extension:
+Search queries are automatically expanded for code identifier matching:
 
-```ts
-import { autoChunker } from 'retriv/chunkers/auto'
+| Query | Expanded | Why |
+|-------|----------|-----|
+| `getUserName` | `get User Name getUserName` | camelCase splitting |
+| `MAX_RETRY_COUNT` | `MAX RETRY COUNT MAX_RETRY_COUNT` | snake_case splitting |
+| `React.useState` | `React use State useState` | dotted path + camelCase |
+| `how to get user` | `how to get user` | Natural language unchanged |
 
-const search = await createRetriv({
-  driver: sqliteFts({ path: './search.db' }),
-  chunking: {
-    chunker: await autoChunker(), // .ts/.py → code chunker, .md → markdown chunker
-  },
-})
+This improves BM25 recall on code identifiers while being transparent for natural language queries.
 
-await search.index([
-  { id: 'src/auth.ts', content: codeFile },
-  { id: 'docs/guide.md', content: markdownFile },
-])
-```
-
-Falls back to markdown chunking if `code-chunk` is not installed.
-
-#### Custom Chunker
-
-Pass any function matching the `Chunker` type:
-
-```ts
-import type { Chunker } from 'retriv'
-
-const myChunker: Chunker = (content, meta) => {
-  // Split however you like, return { text, range?, context? }[]
-  return [{ text: content }]
-}
-
-const search = await createRetriv({
-  driver: sqliteFts({ path: ':memory:' }),
-  chunking: { chunker: myChunker },
-})
-```
-
-#### Code Query Tokenization
-
-`createRetriv` automatically expands code identifiers in search queries for better BM25 matching — `getUserName` becomes `get User Name getUserName`, `MAX_RETRY_COUNT` becomes `MAX RETRY COUNT MAX_RETRY_COUNT`. This is a no-op on natural language queries.
-
-The tokenizer is also available standalone:
+Available standalone:
 
 ```ts
 import { tokenizeCodeQuery } from 'retriv/utils/code-tokenize'
-
-tokenizeCodeQuery('getUserName') // → 'get User Name getUserName'
-tokenizeCodeQuery('how to get user') // → 'how to get user' (unchanged)
 ```
-
-### Chunkers
-
-| Chunker | Import | Peer Dependencies |
-|---------|--------|-------------------|
-| Code | `retriv/chunkers/code` | `code-chunk` |
-| Markdown | `retriv/chunkers/markdown` | — |
-| Auto | `retriv/chunkers/auto` | `code-chunk` (optional) |
 
 ## Drivers
 
-### Hybrid (Recommended)
+### Hybrid (BM25 + Vector)
 
 | Driver | Import | Peer Dependencies |
 |--------|--------|-------------------|
 | SQLite | `retriv/db/sqlite` | `sqlite-vec` (Node.js >= 22.5) |
 
-### Vector-Only (for composed hybrid)
+### Vector-Only
 
 | Driver | Import | Peer Dependencies |
 |--------|--------|-------------------|
@@ -261,7 +194,7 @@ tokenizeCodeQuery('how to get user') // → 'how to get user' (unchanged)
 | pgvector | `retriv/db/pgvector` | `pg` |
 | sqlite-vec | `retriv/db/sqlite-vec` | `sqlite-vec` (Node.js >= 22.5) |
 
-### Keyword-Only (for composed hybrid)
+### Keyword-Only (BM25)
 
 | Driver | Import | Peer Dependencies |
 |--------|--------|-------------------|
@@ -281,7 +214,7 @@ All vector drivers accept an `embeddings` config:
 | Transformers | `retriv/embeddings/transformers` | `@huggingface/transformers` |
 
 ```ts
-// Cloud providers (require API keys)
+// Cloud (require API keys)
 openai({ model: 'text-embedding-3-small' })
 google({ model: 'text-embedding-004' })
 mistral({ model: 'mistral-embed' })
@@ -294,7 +227,7 @@ transformers({ model: 'Xenova/all-MiniLM-L6-v2' })
 
 ## API
 
-### SearchProvider Interface
+### SearchProvider
 
 All drivers implement the same interface:
 
@@ -308,7 +241,7 @@ interface SearchProvider {
 }
 ```
 
-### Search Options
+### SearchOptions
 
 ```ts
 interface SearchOptions {
@@ -319,35 +252,18 @@ interface SearchOptions {
 }
 ```
 
-### Search Result
+### SearchResult
 
 ```ts
 interface SearchResult {
-  id: string // Document ID
+  id: string // Document ID (or chunk ID like "src/auth.ts#chunk-0")
   score: number // 0-1, higher is better
   content?: string // If returnContent: true
   metadata?: Record<string, any> // If returnMetadata: true
-  _chunk?: ChunkInfo // When chunking enabled
+  _chunk?: ChunkInfo // When chunking enabled: { parentId, index, range }
   _meta?: SearchMeta // If returnMeta: true (driver-specific extras)
 }
 ```
-
-## Benchmarks
-
-Retrieval accuracy on Nuxt documentation (2,817 chunks):
-
-| Test Type | FTS | Vector | Hybrid |
-|-----------|-----|--------|--------|
-| Exact terminology (ports, config names) | 7/7 | 5/7 | 7/7 |
-| Doc retrieval (keyword overlap) | 0/7 | 5/7 | 5/7 |
-| Semantic queries (synonyms, no overlap) | 1/6 | 5/6 | 5/6 |
-| **Total** | **8/20 (40%)** | **15/20 (75%)** | **17/20 (85%)** |
-
-- **FTS** excels at exact terms but fails semantic queries ("reuse logic" → composables)
-- **Vector** understands meaning but misses precise terminology (".global" suffix)
-- **Hybrid** combines both - best overall recall across query types
-
-Run locally: `pnpm test:eval`
 
 ## Sponsors
 
