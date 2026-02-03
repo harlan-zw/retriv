@@ -1,6 +1,6 @@
-import type { ComposedDriver, Document, DriverInput, RetrivOptions, SearchOptions, SearchProvider, SearchResult } from './types'
+import type { Chunker, ComposedDriver, Document, DriverInput, RetrivOptions, SearchOptions, SearchProvider, SearchResult } from './types'
+import { autoChunker } from './chunkers/auto'
 import { tokenizeCodeQuery } from './utils/code-tokenize'
-import { splitText } from './utils/split-text'
 
 const RRF_K = 60
 
@@ -47,6 +47,15 @@ function applyRRF(resultSets: SearchResult[][]): SearchResult[] {
 export async function createRetriv(options: RetrivOptions): Promise<SearchProvider> {
   const { driver: driverInput, chunking } = options
 
+  // Resolve default chunker — autoChunker routes code vs markdown by file extension
+  let resolvedChunker: Chunker | undefined
+  if (chunking) {
+    resolvedChunker = chunking.chunker ?? await autoChunker({
+      markdown: { chunkSize: chunking.chunkSize, chunkOverlap: chunking.chunkOverlap },
+      code: {},
+    })
+  }
+
   // Resolve driver(s)
   let drivers: SearchProvider[]
 
@@ -69,21 +78,13 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
   const parentDocs = new Map<string, Document>()
 
   async function prepareDocs(docs: Document[]): Promise<Document[]> {
-    if (!chunking)
+    if (!resolvedChunker)
       return docs
 
-    const { chunkSize = 1000, chunkOverlap = 200, chunker } = chunking
     const chunkedDocs: Document[] = []
 
     for (const doc of docs) {
-      let chunks: { text: string, range?: [number, number], context?: string }[]
-
-      if (chunker) {
-        chunks = await chunker(doc.content, { id: doc.id, metadata: doc.metadata })
-      }
-      else {
-        chunks = splitText(doc.content, { chunkSize, chunkOverlap })
-      }
+      const chunks = await resolvedChunker(doc.content, { id: doc.id, metadata: doc.metadata })
 
       if (chunks.length <= 1) {
         chunkedDocs.push(doc)
