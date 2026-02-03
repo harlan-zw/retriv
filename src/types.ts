@@ -50,6 +50,31 @@ export interface SearchResult {
 }
 
 /**
+ * Filter operator for metadata queries
+ */
+export type FilterOperator
+  = | { $eq: string | number | boolean }
+    | { $ne: string | number | boolean }
+    | { $gt: number }
+    | { $gte: number }
+    | { $lt: number }
+    | { $lte: number }
+    | { $in: (string | number)[] }
+    | { $prefix: string }
+    | { $exists: boolean }
+
+/**
+ * Filter value — either exact match or operator
+ */
+export type FilterValue = string | number | boolean | FilterOperator
+
+/**
+ * Metadata filter — keys are metadata field names, values are match conditions.
+ * Multiple keys = AND.
+ */
+export type SearchFilter = Record<string, FilterValue>
+
+/**
  * Search options
  */
 export interface SearchOptions {
@@ -61,6 +86,8 @@ export interface SearchOptions {
   returnMetadata?: boolean
   /** Return driver-specific _meta */
   returnMeta?: boolean
+  /** Filter results by metadata fields */
+  filter?: SearchFilter
 }
 
 /**
