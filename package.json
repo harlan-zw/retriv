@@ -95,6 +95,10 @@
       "types": "./dist/rerankers/cohere.d.mts",
       "import": "./dist/rerankers/cohere.mjs"
     },
+    "./rerankers/jina": {
+      "types": "./dist/rerankers/jina.d.mts",
+      "import": "./dist/rerankers/jina.mjs"
+    },
     "./utils/code-tokenize": {
       "types": "./dist/utils/code-tokenize.d.mts",
       "import": "./dist/utils/code-tokenize.mjs"
