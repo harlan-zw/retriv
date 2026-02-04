@@ -37,9 +37,10 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 ## Features
 
 - 🎯 **3-way hybrid fusion search** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)
-- 📦 **Zero infrastructure** — single SQLite file, no servers, ~1.4 kB gzipped core
+- 📦 **Local to cloud** — start with a single SQLite file, scale to cloud providers for vectors, embeddings, and reranking
 - 🌳 **AST-aware code chunking** — powered by [`code-chunk`](https://github.com/supermemoryai/code-chunk), uses [tree-sitter](https://tree-sitter.github.io/) to split on function/class boundaries with entity, scope, and import metadata
 - 🔍 **Search filtering** — narrow results by file type, path prefix, or any custom field
+- 🔄 **Optional reranking** — plug in a cross-encoder to re-score results after fusion for even better precision
 - 🔌 **Swappable backends** — SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
 
 ## Installation
@@ -66,6 +67,7 @@ import { createRetriv } from 'retriv'
 import { autoChunker } from 'retriv/chunkers/auto'
 import sqlite from 'retriv/db/sqlite'
 import { transformersJs } from 'retriv/embeddings/transformers-js'
+import { crossEncoder } from 'retriv/rerankers/transformers-js'
 
 const search = await createRetriv({
   driver: sqlite({
@@ -73,6 +75,7 @@ const search = await createRetriv({
     embeddings: transformersJs(),
   }),
   chunking: autoChunker(), // code + markdown-aware splitting
+  rerank: await crossEncoder(), // cross-encoder reranking for better precision
 })
 ```
 
@@ -112,6 +115,34 @@ await search.search('getUserName', { filter: { type: 'code' } })
 // [
 //   { id: 'src/auth.ts#chunk-0', score: 0.91, _chunk: { parentId: 'src/auth.ts', index: 0, range: [0, 139] } },
 // ]
+```
+
+### Reranking
+
+Add a cross-encoder reranking pass after fusion. The reranker re-scores candidates using query-document attention, improving precision on top results:
+
+```ts
+import { crossEncoder } from 'retriv/rerankers/transformers-js'
+
+const search = await createRetriv({
+  driver: sqlite({
+    path: './search.db',
+    embeddings: transformersJs(),
+  }),
+  rerank: await crossEncoder(), // local cross-encoder, no API key
+})
+```
+
+The reranker automatically over-fetches 3x candidates, re-scores them, then trims to your requested `limit`. Results without content are passed through unchanged.
+
+You can also pass any function matching `(query: string, results: SearchResult[]) => Promise<SearchResult[]>`:
+
+```ts
+// Custom reranker (e.g. Cohere rerank API)
+rerank: async (query, results) => {
+  const reranked = await cohereRerank(query, results)
+  return reranked
+}
 ```
 
 ### Cloud Embeddings
@@ -397,6 +428,18 @@ interface ChunkerChunk {
   imports?: ChunkImport[] // { name, source, isDefault?, isNamespace? }
   siblings?: ChunkSibling[] // { name, type, position: 'before'|'after', distance }
 }
+```
+
+## Rerankers
+
+| Reranker | Import | Peer Dependencies |
+|----------|--------|-------------------|
+| Cross-encoder | `retriv/rerankers/transformers-js` | `@huggingface/transformers` |
+
+```ts
+// Local cross-encoder (default: Xenova/ms-marco-MiniLM-L-6-v2)
+await crossEncoder()
+await crossEncoder({ model: 'Xenova/ms-marco-MiniLM-L-6-v2' })
 ```
 
 ## Related

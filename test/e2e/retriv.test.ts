@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { markdownChunker } from '../../src/chunkers/markdown'
 import { sqlite } from '../../src/db/sqlite'
 import { sqliteFts } from '../../src/db/sqlite-fts'
@@ -160,6 +160,24 @@ describe('unified sqlite driver', () => {
     expect(afterClear.length).toBe(0)
 
     await search.close?.()
+  })
+
+  it('supports reranker option', async () => {
+    const reranker = vi.fn(async (_query: string, results: any[]) => [...results].reverse())
+
+    const search = await createRetriv({
+      driver: sqlite({ path: ':memory:', embeddings }),
+      rerank: reranker,
+    })
+
+    await search.index([
+      { id: '1', content: 'machine learning algorithms' },
+      { id: '2', content: 'deep learning neural networks' },
+    ])
+
+    const results = await search.search('learning', { limit: 2 })
+    expect(reranker).toHaveBeenCalledOnce()
+    expect(results).toHaveLength(2)
   })
 
   it('supports chunking', async () => {
