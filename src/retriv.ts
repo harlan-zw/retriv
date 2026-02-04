@@ -64,6 +64,10 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
     drivers = [resolved]
   }
 
+  const reranker = options.rerank
+    ? await options.rerank.resolve()
+    : undefined
+
   const isHybrid = drivers.length > 1
   const parentDocs = new Map<string, Document>()
 
@@ -149,22 +153,33 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
 
     async search(query: string, searchOptions: SearchOptions = {}): Promise<SearchResult[]> {
       const expandedQuery = tokenizeCodeQuery(query)
+      // over-fetch when reranking to give reranker more candidates
+      const fetchLimit = reranker && searchOptions.limit
+        ? searchOptions.limit * 3
+        : searchOptions.limit
+      const fetchOptions = fetchLimit
+        ? { ...searchOptions, limit: fetchLimit }
+        : searchOptions
+
+      let results: SearchResult[]
 
       if (!isHybrid) {
-        const results = await drivers[0].search(expandedQuery, searchOptions)
-        return annotateChunks(results)
+        results = await drivers[0].search(expandedQuery, fetchOptions)
+      }
+      else {
+        const resultSets = await Promise.all(
+          drivers.map(d => d.search(expandedQuery, fetchOptions)),
+        )
+        results = applyRRF(resultSets)
       }
 
-      const resultSets = await Promise.all(
-        drivers.map(d => d.search(expandedQuery, searchOptions)),
-      )
-
-      let merged = applyRRF(resultSets)
+      if (reranker)
+        results = await reranker(query, results)
 
       if (searchOptions.limit)
-        merged = merged.slice(0, searchOptions.limit)
+        results = results.slice(0, searchOptions.limit)
 
-      return annotateChunks(merged)
+      return annotateChunks(results)
     },
 
     async remove(ids: string[]) {

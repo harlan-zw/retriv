@@ -14,6 +14,8 @@ export type {
   EmbeddingProvider,
   FilterOperator,
   FilterValue,
+  Reranker,
+  RerankerConfig,
   RetrivOptions,
   SearchFilter,
   SearchOptions,

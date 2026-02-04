@@ -1,7 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { markdownChunker } from '../src/chunkers/markdown'
 import { sqliteFts } from '../src/db/sqlite-fts'
 import { createRetriv } from '../src/retriv'
+
+function mockDriver(results: any[]) {
+  return {
+    async index() { return { count: 0 } },
+    async search() { return results },
+  }
+}
 
 describe('createRetriv', () => {
   it('works without chunking', async () => {
@@ -172,4 +179,60 @@ Conclusion with final thoughts.`
 
   // Composed drivers and hybrid sqlite tests are in test/e2e/retriv.test.ts
   // (they require embedding models which are slow to load)
+})
+
+describe('reranking', () => {
+  it('calls reranker after search and returns reranked order', async () => {
+    const rerankerFn = vi.fn(async (_query: string, results: any[]) => {
+      return [...results].reverse()
+    })
+
+    const retriv = await createRetriv({
+      driver: mockDriver([
+        { id: 'a', score: 0.9 },
+        { id: 'b', score: 0.8 },
+        { id: 'c', score: 0.7 },
+      ]),
+      rerank: { resolve: async () => rerankerFn },
+    })
+
+    await retriv.index([])
+    const results = await retriv.search('test', { limit: 3 })
+
+    expect(rerankerFn).toHaveBeenCalledOnce()
+    expect(rerankerFn).toHaveBeenCalledWith('test', expect.any(Array))
+    expect(results.map(r => r.id)).toEqual(['c', 'b', 'a'])
+  })
+
+  it('fetches extra results for reranking then trims to limit', async () => {
+    const rerankerFn = vi.fn(async (_query: string, results: any[]) => results)
+
+    const driver = mockDriver([
+      { id: 'a', score: 0.9 },
+      { id: 'b', score: 0.8 },
+      { id: 'c', score: 0.7 },
+      { id: 'd', score: 0.6 },
+    ])
+    const searchSpy = vi.spyOn(driver, 'search')
+
+    const retriv = await createRetriv({
+      driver,
+      rerank: { resolve: async () => rerankerFn },
+    })
+
+    await retriv.index([])
+    const results = await retriv.search('test', { limit: 2 })
+
+    expect(searchSpy).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ limit: 6 }))
+    expect(results).toHaveLength(2)
+  })
+
+  it('works without reranker (no-op)', async () => {
+    const retriv = await createRetriv({
+      driver: mockDriver([{ id: 'a', score: 0.9 }]),
+    })
+
+    const results = await retriv.search('test')
+    expect(results).toHaveLength(1)
+  })
 })

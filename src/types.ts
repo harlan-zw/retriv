@@ -135,6 +135,23 @@ export interface BaseDriverConfig {
 }
 
 // ============================================
+// Reranker types
+// ============================================
+
+/**
+ * Reranker function — re-scores and reorders search results
+ */
+export type Reranker = (query: string, results: SearchResult[]) => Promise<SearchResult[]>
+
+/**
+ * Reranker config (returned by reranker modules)
+ */
+export interface RerankerConfig {
+  /** Resolve the reranker function (lazy-loaded, cached) */
+  resolve: () => Promise<Reranker>
+}
+
+// ============================================
 // Embedding types
 // ============================================
 
@@ -305,4 +322,6 @@ export interface RetrivOptions {
   driver: DriverInput
   /** Chunker function from retriv/chunkers/ */
   chunking?: Chunker
+  /** Reranker to apply after fusion */
+  rerank?: RerankerConfig
 }
