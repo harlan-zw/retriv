@@ -55,8 +55,8 @@ For code search (AST-aware chunking):
 1. Install extra dependencies:
 
 ```bash
-# code-chunk for AST parsing, sqlite-vec for vector storage, transformers-js for local embeddings
-pnpm add code-chunk sqlite-vec @huggingface/transformers-js
+# code-chunk for AST parsing, sqlite-vec for vector storage, transformers for local embeddings
+pnpm add code-chunk sqlite-vec @huggingface/transformers
 ```
 
 2. Create your retriv search instance:
@@ -71,8 +71,8 @@ const search = await createRetriv({
   driver: sqlite({
     path: './search.db',
     embeddings: transformersJs(),
-    chunking: autoChunker(), // code + markdown-aware splitting
   }),
+  chunking: autoChunker(), // code + markdown-aware splitting
 })
 ```
 
@@ -280,7 +280,7 @@ Multiple keys in a filter are ANDed together.
 
 | Driver | Import | Peer Dependencies |
 |--------|--------|-------------------|
-| SQLite [FTS5](https://www.sqlite.org/fts5.html) | `retriv/db/sqlite-fts` | `better-sqlite3` |
+| SQLite [FTS5](https://www.sqlite.org/fts5.html) | `retriv/db/sqlite-fts` | — (Node.js >= 22.5) |
 
 ## Embedding Providers
 
@@ -293,7 +293,7 @@ All vector drivers accept an `embeddings` config:
 | Mistral | `retriv/embeddings/mistral` | `@ai-sdk/mistral ai` |
 | Cohere | `retriv/embeddings/cohere` | `@ai-sdk/cohere ai` |
 | Ollama | `retriv/embeddings/ollama` | `ollama-ai-provider-v2 ai` |
-| Transformers | `retriv/embeddings/transformers` | `@huggingface/transformers-js` |
+| Transformers.js | `retriv/embeddings/transformers-js` | `@huggingface/transformers` |
 
 ```ts
 // Cloud (require API keys)
@@ -304,7 +304,7 @@ cohere({ model: 'embed-english-v3.0' })
 
 // Local (no API key)
 ollama({ model: 'nomic-embed-text' })
-transformers({ model: 'Xenova/all-MiniLM-L6-v2' })
+transformersJs({ model: 'Xenova/all-MiniLM-L6-v2' })
 ```
 
 ## API

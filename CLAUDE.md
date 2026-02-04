@@ -11,20 +11,21 @@ pnpm test            # Run vitest (unit tests)
 pnpm test -- -t "chunks"  # Run single test by name
 pnpm test:e2e        # Run e2e tests (all local drivers)
 PG_URL=postgres://... pnpm test:e2e  # Include pgvector
+pnpm test:eval       # Run evaluation tests
 pnpm lint            # ESLint
 pnpm typecheck       # TypeScript check
 ```
 
 ## Architecture
 
-**Hybrid search infrastructure for Markdown** - combines BM25 keyword + vector semantic search with RRF fusion for 15-30% better recall than single methods.
+**Hybrid search infrastructure** - combines BM25 keyword + vector semantic search with RRF fusion for 15-30% better recall than single methods.
 
 ### Core Abstraction
 
 `SearchProvider` (src/types.ts) - unified interface all drivers implement:
-- `mode`: 'semantic' | 'fulltext' | 'hybrid'
 - `index(docs)`: Index documents
 - `search(query, options)`: Returns `SearchResult[]` with normalized 0-1 scores
+- `options.filter`: MongoDB-like metadata filtering (`$eq`, `$gt`, `$in`, `$prefix`, `$exists`, etc.)
 
 ### Driver Categories
 
@@ -32,7 +33,7 @@ pnpm typecheck       # TypeScript check
 - `sqlite.ts` - FTS5 + sqlite-vec combined, uses node:sqlite (Node 22.5+), RRF fusion
 
 **FTS** (src/db/):
-- `sqlite-fts.ts` - SQLite FTS5 with BM25 ranking, uses better-sqlite3
+- `sqlite-fts.ts` - SQLite FTS5 with BM25 ranking, uses node:sqlite (Node 22.5+)
 
 **Vector** (src/db/):
 - `sqlite-vec.ts` - sqlite-vec extension, requires Node 22.5+
@@ -44,14 +45,23 @@ pnpm typecheck       # TypeScript check
 **Embeddings** (src/embeddings/):
 - `openai.ts`, `google.ts`, `mistral.ts`, `cohere.ts` - Cloud providers via AI SDK
 - `ollama.ts` - Local Ollama
-- `transformers.ts` - Transformers.js (pure JS, no API)
+- `transformers-js.ts` - Transformers.js (pure JS, no API)
 - `resolve.ts` - Lazy loads and caches embedding providers, detects dimensions
+- `model-info.ts` - Model dimension registry, preset resolution (e.g. maps model names to Xenova/ prefixes)
+
+**Chunkers** (src/chunkers/):
+- `markdown.ts` - Heading-aware recursive splitting (default chunker)
+- `code.ts` - Tree-sitter AST-based via `code-chunk` package, preserves class/function context
+- `auto.ts` - Routes to code or markdown chunker based on file extension
 
 ### Key Files
 
 - `src/retriv.ts` - `createRetriv()` factory: multi-driver fusion (RRF k=60), opt-in chunking
 - `src/db/sqlite.ts` - Single-file hybrid driver with built-in RRF fusion
+- `src/filter.ts` - Filter compilation (SQL for sqlite/pg) and in-memory matching
 - `src/utils/split-text.ts` - Text chunking for large documents
+- `src/utils/code-tokenize.ts` - Splits camelCase/snake_case identifiers for code search queries
+- `src/utils/extract-snippet.ts` - BM25-scored snippet extraction around query matches
 
 ### Patterns
 
@@ -72,3 +82,18 @@ Two ways to get hybrid search:
 2. `createRetriv({ driver: { vector, keyword } })` - Compose separate drivers
 
 Both use Reciprocal Rank Fusion (RRF) with k=60 to merge results.
+
+### Chunking
+
+Chunking is opt-in via `createRetriv({ chunking: markdownChunker() })`. When enabled:
+- Documents are split into chunks indexed as `{docId}#chunk-{i}`
+- Chunk metadata (`_parentId`, `_chunkIndex`, `_chunkRange`) is attached
+- Results include `_chunk: { parentId, index, range }` for reassembly
+- Code queries are auto-tokenized (e.g. `getUserName` → `get User Name getUserName`)
+
+### Test Infrastructure
+
+Vitest workspace with three projects:
+- **unit** - `test/**/*.test.ts` (excludes e2e)
+- **e2e** - `test/e2e/**/*.test.ts` (excludes eval)
+- **eval** - `test/**/*.eval.test.ts`
