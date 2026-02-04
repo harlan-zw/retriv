@@ -43,7 +43,7 @@ function applyRRF(resultSets: SearchResult[][]): SearchResult[] {
 /**
  * Create a unified retrieval instance
  */
-export async function createRetriv(options: RetrivOptions): Promise<SearchProvider> {
+export async function createRetriv(options: RetrivOptions): Promise<SearchProvider & { _testSetCategories?: (cats: string[]) => void }> {
   const { driver: driverInput, chunking: resolvedChunker } = options
 
   // Resolve driver(s)
@@ -70,8 +70,18 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
 
   const isHybrid = drivers.length > 1
   const parentDocs = new Map<string, Document>()
+  const seenCategories = new Set<string>()
+  const categorize = options.categories
 
   async function prepareDocs(docs: Document[]): Promise<Document[]> {
+    if (categorize) {
+      for (const doc of docs) {
+        const cat = categorize(doc)
+        doc.metadata = { ...doc.metadata, category: cat }
+        seenCategories.add(cat)
+      }
+    }
+
     if (!resolvedChunker)
       return docs
 
@@ -163,7 +173,25 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
 
       let results: SearchResult[]
 
-      if (!isHybrid) {
+      if (seenCategories.size > 1) {
+        const categoryResults = await Promise.all(
+          [...seenCategories].map((cat) => {
+            const catOptions = {
+              ...fetchOptions,
+              filter: { ...fetchOptions.filter, category: { $eq: cat } },
+            }
+
+            if (!isHybrid)
+              return drivers[0].search(expandedQuery, catOptions)
+
+            return Promise.all(
+              drivers.map(d => d.search(expandedQuery, catOptions)),
+            ).then(sets => applyRRF(sets))
+          }),
+        )
+        results = applyRRF(categoryResults)
+      }
+      else if (!isHybrid) {
         results = await drivers[0].search(expandedQuery, fetchOptions)
       }
       else {
@@ -196,6 +224,12 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
 
     async close() {
       await Promise.all(drivers.filter(d => d.close).map(d => d.close!()))
+    },
+
+    // Test helper — allows tests to inject seen categories without indexing
+    _testSetCategories(cats: string[]) {
+      seenCategories.clear()
+      cats.forEach(c => seenCategories.add(c))
     },
   }
 }

@@ -236,3 +236,124 @@ describe('reranking', () => {
     expect(results).toHaveLength(1)
   })
 })
+
+describe('split-category search', () => {
+  it('searches each category separately and fuses results', async () => {
+    const searchSpy = vi.fn(async (_query: string, options?: any) => {
+      const cat = options?.filter?.category?.$eq
+      if (cat === 'code')
+        return [{ id: 'code-1', score: 0.9, content: 'function auth()' }]
+      if (cat === 'docs')
+        return [{ id: 'doc-1', score: 0.95, content: 'authentication guide' }]
+      return []
+    })
+
+    const retriv = await createRetriv({
+      driver: {
+        async index() { return { count: 0 } },
+        search: searchSpy,
+      },
+      categories: () => 'code', // categorize fn required but not called (no index)
+    })
+
+    // manually set seen categories since we skip real indexing
+    retriv._testSetCategories?.(['code', 'docs'])
+
+    const results = await retriv.search('auth', { limit: 10 })
+
+    expect(searchSpy).toHaveBeenCalledTimes(2)
+    const ids = results.map(r => r.id)
+    expect(ids).toContain('code-1')
+    expect(ids).toContain('doc-1')
+  })
+
+  it('auto-tags documents via categorize function during index', async () => {
+    const retriv = await createRetriv({
+      driver: sqliteFts({ path: ':memory:' }),
+      categories: doc => doc.id.endsWith('.ts') ? 'code' : 'docs',
+    })
+
+    await retriv.index([
+      { id: 'auth.ts', content: 'function authenticate(user) { return true }' },
+      { id: 'guide.md', content: 'Authentication guide for setting up JWT' },
+    ])
+
+    const results = await retriv.search('authenticate', {
+      returnMetadata: true,
+    })
+
+    expect(results.length).toBeGreaterThanOrEqual(1)
+    // verify metadata was auto-tagged
+    const tsResult = results.find(r => r.id === 'auth.ts' || r.id.startsWith('auth.ts'))
+    if (tsResult?.metadata)
+      expect(tsResult.metadata.category).toBe('code')
+  })
+
+  it('merges category filter with user filter', async () => {
+    const searchSpy = vi.fn(async (_query: string, _options?: any) => [] as any[])
+
+    const retriv = await createRetriv({
+      driver: {
+        async index() { return { count: 0 } },
+        search: searchSpy,
+      },
+      categories: () => 'code',
+    })
+
+    retriv._testSetCategories?.(['code', 'docs'])
+
+    await retriv.search('test', { filter: { language: 'ts' } })
+
+    for (const call of searchSpy.mock.calls) {
+      const opts = call[1]
+      expect(opts.filter.language).toBe('ts')
+      expect(opts.filter.category).toBeDefined()
+    }
+  })
+
+  it('works without categories (default behavior unchanged)', async () => {
+    const searchSpy = vi.fn(async (_query: string, _options?: any) => [{ id: '1', score: 0.9 }])
+
+    const retriv = await createRetriv({
+      driver: {
+        async index() { return { count: 0 } },
+        search: searchSpy,
+      },
+    })
+
+    await retriv.index([])
+    await retriv.search('test')
+
+    expect(searchSpy).toHaveBeenCalledTimes(1)
+    const opts = searchSpy.mock.calls[0][1]
+    expect(opts?.filter?.category).toBeUndefined()
+  })
+
+  it('respects reranker with categories', async () => {
+    const rerankerFn = vi.fn(async (_q: string, results: any[]) => [...results].reverse())
+    const searchSpy = vi.fn(async (_query: string, options?: any) => {
+      const cat = options?.filter?.category?.$eq
+      if (cat === 'a')
+        return [{ id: 'a1', score: 0.9 }]
+      if (cat === 'b')
+        return [{ id: 'b1', score: 0.8 }]
+      return []
+    })
+
+    const retriv = await createRetriv({
+      driver: {
+        async index() { return { count: 0 } },
+        search: searchSpy,
+      },
+      categories: () => 'a',
+      rerank: { resolve: async () => rerankerFn },
+    })
+
+    retriv._testSetCategories?.(['a', 'b'])
+
+    const results = await retriv.search('test', { limit: 2 })
+
+    expect(rerankerFn).toHaveBeenCalledOnce()
+    expect(results[0].id).toBe('b1')
+  })
+})

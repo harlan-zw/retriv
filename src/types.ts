@@ -316,6 +316,12 @@ export interface ComposedDriver {
 export type DriverInput = AnyDriver | ComposedDriver
 
 /**
+ * Categorize function — derives a category name from a document.
+ * Used by split-category search to auto-tag documents at index time.
+ */
+export type Categorizer = (doc: Document) => string
+
+/**
  * Options for createRetriv factory
  */
 export interface RetrivOptions {
@@ -324,4 +330,10 @@ export interface RetrivOptions {
   chunking?: Chunker
   /** Reranker to apply after fusion */
   rerank?: RerankerConfig
+  /**
+   * Categorize function for split-category search.
+   * Documents are auto-tagged with `metadata.category` at index time.
+   * Search fans out per-category and fuses with RRF.
+   */
+  categories?: Categorizer
 }
