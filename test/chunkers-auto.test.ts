@@ -36,14 +36,14 @@ describe('detectContentType', () => {
 
 describe('autoChunker', () => {
   it('uses markdown chunker for .md files', async () => {
-    const chunker = await autoChunker()
+    const chunker = autoChunker()
     const chunks = await chunker('# Hello\n\nWorld', { id: 'readme.md' })
     expect(chunks.length).toBeGreaterThanOrEqual(1)
     expect(chunks[0]!.text).toContain('Hello')
   })
 
   it('falls back to markdown chunker when code-chunk unavailable', async () => {
-    const chunker = await autoChunker()
+    const chunker = autoChunker()
     // Even for .ts files, if code-chunk isn't installed, should fall back
     const chunks = await chunker('export const x = 1', { id: 'test.ts' })
     expect(chunks.length).toBeGreaterThanOrEqual(1)

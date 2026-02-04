@@ -49,7 +49,7 @@ pnpm typecheck       # TypeScript check
 
 ### Key Files
 
-- `src/retriv.ts` - `createRetriv()` factory: multi-driver fusion (RRF k=60), chunking
+- `src/retriv.ts` - `createRetriv()` factory: multi-driver fusion (RRF k=60), opt-in chunking
 - `src/db/sqlite.ts` - Single-file hybrid driver with built-in RRF fusion
 - `src/utils/split-text.ts` - Text chunking for large documents
 

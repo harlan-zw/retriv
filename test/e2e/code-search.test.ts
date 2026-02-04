@@ -61,7 +61,7 @@ A \`SearchProvider\` with index, search, remove, clear, close methods.
 async function createCodeSearch() {
   const retriv = await createRetriv({
     driver: sqliteFts({ path: ':memory:' }),
-    chunking: { chunker: await codeChunker() },
+    chunking: codeChunker(),
   })
   await retriv.index(docs)
   return retriv
@@ -71,7 +71,7 @@ async function createCodeSearch() {
 async function createMixedSearch() {
   const retriv = await createRetriv({
     driver: sqliteFts({ path: ':memory:' }),
-    chunking: { chunker: await autoChunker() },
+    chunking: autoChunker(),
   })
   const allDocs = [
     ...docs,
@@ -153,7 +153,7 @@ describe('code search e2e', () => {
       // Use inline sample code with auth functions
       const retriv = await createRetriv({
         driver: sqliteFts({ path: ':memory:' }),
-        chunking: { chunker: await codeChunker() },
+        chunking: codeChunker(),
       })
       await retriv.index([
         {
@@ -372,7 +372,6 @@ export function verifyPassword(password: string, hash: string): boolean {
     it('filters by metadata on code documents', async () => {
       const retriv = await createRetriv({
         driver: sqliteFts({ path: ':memory:' }),
-        chunking: false,
       })
 
       await retriv.index([
@@ -400,7 +399,6 @@ export function verifyPassword(password: string, hash: string): boolean {
     it('removes indexed code file', async () => {
       const retriv = await createRetriv({
         driver: sqliteFts({ path: ':memory:' }),
-        chunking: false,
       })
       await retriv.index([
         { id: 'a.ts', content: 'export function alpha() {}' },
@@ -419,7 +417,6 @@ export function verifyPassword(password: string, hash: string): boolean {
     it('clears all code documents', async () => {
       const retriv = await createRetriv({
         driver: sqliteFts({ path: ':memory:' }),
-        chunking: false,
       })
       await retriv.index(docs.slice(0, 3))
       await retriv.clear?.()
@@ -435,7 +432,6 @@ export function verifyPassword(password: string, hash: string): boolean {
     it('updates content on re-index', async () => {
       const retriv = await createRetriv({
         driver: sqliteFts({ path: ':memory:' }),
-        chunking: false,
       })
 
       await retriv.index([{ id: 'main.ts', content: 'the zebra gallops across the savannah' }])

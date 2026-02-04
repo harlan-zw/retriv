@@ -6,7 +6,6 @@ export type {
   Chunker,
   ChunkerChunk,
   ChunkInfo,
-  ChunkingOptions,
   Document,
   EmbeddingConfig,
   EmbeddingProvider,

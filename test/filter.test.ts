@@ -1,5 +1,6 @@
 import type { FilterValue, SearchFilter } from '../src/types'
 import { describe, expect, expectTypeOf, it } from 'vitest'
+import { markdownChunker } from '../src/chunkers/markdown'
 import { sqlite } from '../src/db/sqlite'
 import { sqliteFts } from '../src/db/sqlite-fts'
 import { sqliteVec } from '../src/db/sqlite-vec'
@@ -382,7 +383,7 @@ describe('createRetriv filter', () => {
   it('filters work with chunking', async () => {
     const retriv = await createRetriv({
       driver: sqliteFts({ path: ':memory:' }),
-      chunking: { chunkSize: 30, chunkOverlap: 0 },
+      chunking: markdownChunker({ chunkSize: 30, chunkOverlap: 0 }),
     })
     await retriv.index([
       { id: 'doc1', content: 'First section content.\n\nSecond section content.', metadata: { type: 'docs' } },

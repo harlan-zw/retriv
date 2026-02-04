@@ -231,16 +231,6 @@ export interface ChunkerChunk {
 export type Chunker = (content: string, meta?: { id?: string, metadata?: Record<string, any> }) => ChunkerChunk[] | Promise<ChunkerChunk[]>
 
 /**
- * Chunking configuration
- */
-export interface ChunkingOptions {
-  chunkSize?: number
-  chunkOverlap?: number
-  /** Custom chunker function. Defaults to markdown-aware splitText. */
-  chunker?: Chunker
-}
-
-/**
  * Resolvable driver (can be promise)
  */
 type Resolvable<T> = T | Promise<T>
@@ -268,6 +258,6 @@ export type DriverInput = AnyDriver | ComposedDriver
  */
 export interface RetrivOptions {
   driver: DriverInput
-  /** Chunking config. Enabled by default. Pass `false` to disable. */
-  chunking?: ChunkingOptions | false
+  /** Chunker function from retriv/chunkers/ */
+  chunking?: Chunker
 }

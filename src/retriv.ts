@@ -1,5 +1,4 @@
-import type { Chunker, ComposedDriver, Document, DriverInput, RetrivOptions, SearchOptions, SearchProvider, SearchResult } from './types'
-import { autoChunker } from './chunkers/auto'
+import type { ComposedDriver, Document, DriverInput, RetrivOptions, SearchOptions, SearchProvider, SearchResult } from './types'
 import { tokenizeCodeQuery } from './utils/code-tokenize'
 
 const RRF_K = 60
@@ -45,16 +44,7 @@ function applyRRF(resultSets: SearchResult[][]): SearchResult[] {
  * Create a unified retrieval instance
  */
 export async function createRetriv(options: RetrivOptions): Promise<SearchProvider> {
-  const { driver: driverInput, chunking = {} } = options
-
-  // Resolve default chunker — autoChunker routes code vs markdown by file extension
-  let resolvedChunker: Chunker | undefined
-  if (chunking !== false) {
-    resolvedChunker = chunking.chunker ?? await autoChunker({
-      markdown: { chunkSize: chunking.chunkSize, chunkOverlap: chunking.chunkOverlap },
-      code: {},
-    })
-  }
+  const { driver: driverInput, chunking: resolvedChunker } = options
 
   // Resolve driver(s)
   let drivers: SearchProvider[]
@@ -114,7 +104,7 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
   }
 
   function annotateChunks(results: SearchResult[]): SearchResult[] {
-    if (!chunking)
+    if (!resolvedChunker)
       return results
 
     return results.map((result) => {

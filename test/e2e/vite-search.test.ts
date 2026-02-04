@@ -40,11 +40,11 @@ it('indexes vite dist', async () => {
   const [cs, as_] = await Promise.all([
     createRetriv({
       driver: sqliteFts({ path: ':memory:' }),
-      chunking: { chunker: await codeChunker() },
+      chunking: codeChunker(),
     }),
     createRetriv({
       driver: sqliteFts({ path: ':memory:' }),
-      chunking: { chunker: await autoChunker() },
+      chunking: autoChunker(),
     }),
   ])
   await Promise.all([

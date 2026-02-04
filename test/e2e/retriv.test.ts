@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { markdownChunker } from '../../src/chunkers/markdown'
 import { sqlite } from '../../src/db/sqlite'
 import { sqliteFts } from '../../src/db/sqlite-fts'
 import { sqliteVec } from '../../src/db/sqlite-vec'
@@ -164,7 +165,7 @@ describe('unified sqlite driver', () => {
   it('supports chunking', async () => {
     const search = await createRetriv({
       driver: sqlite({ path: ':memory:', embeddings }),
-      chunking: { chunkSize: 50, chunkOverlap: 10 },
+      chunking: markdownChunker({ chunkSize: 50, chunkOverlap: 10 }),
     })
 
     const longContent = 'First section about machine learning.\n\nSecond section about neural networks.\n\nThird section about deep learning.'

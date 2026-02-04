@@ -1,6 +1,7 @@
 import type { Chunker, ChunkerChunk } from '../types'
 import type { CodeChunkerOptions } from './code'
 import type { MarkdownChunkerOptions } from './markdown'
+import { codeChunker } from './code'
 import { markdownChunker } from './markdown'
 
 const CODE_EXTENSIONS = new Set([
@@ -32,26 +33,16 @@ export interface AutoChunkerOptions {
 /**
  * Auto-detecting chunker that routes to code or markdown chunker
  * based on file extension (derived from document ID).
- *
- * Falls back to markdown chunker if code-chunk is not installed.
  */
-export async function autoChunker(options: AutoChunkerOptions = {}): Promise<Chunker> {
+export function autoChunker(options: AutoChunkerOptions = {}): Chunker {
   const mdChunker = markdownChunker(options.markdown)
-
-  let codeChunkerFn: Chunker | undefined
-  try {
-    const { codeChunker } = await import('./code')
-    codeChunkerFn = await codeChunker(options.code)
-  }
-  catch {
-    // code-chunk not installed, will fall back to markdown
-  }
+  const codeChunkerFn = codeChunker(options.code)
 
   return async (content: string, meta?): Promise<ChunkerChunk[]> => {
     const filePath = meta?.id || ''
     const type = detectContentType(filePath)
 
-    if (type === 'code' && codeChunkerFn) {
+    if (type === 'code') {
       return codeChunkerFn(content, meta)
     }
     return mdChunker(content, meta)

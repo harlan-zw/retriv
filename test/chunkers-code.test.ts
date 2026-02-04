@@ -3,7 +3,7 @@ import { codeChunker } from '../src/chunkers/code'
 
 describe('codeChunker', () => {
   it('chunks a TypeScript file into functions', async () => {
-    const chunker = await codeChunker()
+    const chunker = codeChunker()
     const code = `
 import { ref } from 'vue'
 
@@ -32,7 +32,7 @@ export function useToggle(initial = false) {
   })
 
   it('returns single chunk for small files', async () => {
-    const chunker = await codeChunker()
+    const chunker = codeChunker()
     const code = `export const x = 1`
     const chunks = await chunker(code, { id: 'small.ts' })
     expect(chunks.length).toBe(1)
@@ -40,7 +40,7 @@ export function useToggle(initial = false) {
   })
 
   it('includes context when contextMode is full', async () => {
-    const chunker = await codeChunker({ contextMode: 'full' })
+    const chunker = codeChunker({ contextMode: 'full' })
     const code = `
 import { ref } from 'vue'
 

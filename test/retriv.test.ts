@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { markdownChunker } from '../src/chunkers/markdown'
 import { sqliteFts } from '../src/db/sqlite-fts'
 import { createRetriv } from '../src/retriv'
 
@@ -24,10 +25,7 @@ describe('createRetriv', () => {
   it('chunks large documents', async () => {
     const retriv = await createRetriv({
       driver: sqliteFts({ path: ':memory:' }),
-      chunking: {
-        chunkSize: 50,
-        chunkOverlap: 10,
-      },
+      chunking: markdownChunker({ chunkSize: 50, chunkOverlap: 10 }),
     })
 
     const longContent = 'First section content here.\n\nSecond section with more content.\n\nThird section finale.'
@@ -55,7 +53,7 @@ describe('createRetriv', () => {
   it('preserves metadata through chunking', async () => {
     const retriv = await createRetriv({
       driver: sqliteFts({ path: ':memory:' }),
-      chunking: { chunkSize: 30, chunkOverlap: 0 },
+      chunking: markdownChunker({ chunkSize: 30, chunkOverlap: 0 }),
     })
 
     await retriv.index([
@@ -76,7 +74,7 @@ describe('createRetriv', () => {
   it('does not chunk small documents', async () => {
     const retriv = await createRetriv({
       driver: sqliteFts({ path: ':memory:' }),
-      chunking: { chunkSize: 1000 },
+      chunking: markdownChunker({ chunkSize: 1000 }),
     })
 
     await retriv.index([
@@ -93,7 +91,7 @@ describe('createRetriv', () => {
   it('generates correct chunk IDs', async () => {
     const retriv = await createRetriv({
       driver: sqliteFts({ path: ':memory:' }),
-      chunking: { chunkSize: 20, chunkOverlap: 0 },
+      chunking: markdownChunker({ chunkSize: 20, chunkOverlap: 0 }),
     })
 
     await retriv.index([
@@ -162,9 +160,7 @@ Conclusion with final thoughts.`
 
     const db = await createRetriv({
       driver: sqliteFts({ path: ':memory:' }),
-      chunking: {
-        chunker: customChunker,
-      },
+      chunking: customChunker,
     })
 
     await db.index([{ id: 'doc1', content }])

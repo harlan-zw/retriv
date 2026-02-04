@@ -37,9 +37,9 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 ## Features
 
 - 🎯 **3-way hybrid fusion search** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)
+- 📦 **Zero infrastructure** — single SQLite file, no servers, ~1.4 kB gzipped core
 - 🌳 **AST-aware code chunking** — [tree-sitter](https://tree-sitter.github.io/) splits on function/class boundaries (TypeScript, JavaScript)
-- 🔤 **Automatic query expansion** — `camelCase`/`snake_case` identifiers tokenized for [BM25](https://en.wikipedia.org/wiki/Okapi_BM25)
-- 🔍 **Metadata filtering** — narrow results by file type, path prefix, or any custom field
+- 🔍 **Search filtering** — narrow results by file type, path prefix, or any custom field
 - 🔌 **Swappable backends** — SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
 
 ## Installation
@@ -50,21 +50,24 @@ pnpm add retriv
 
 For code search (AST-aware chunking):
 
-```bash
-pnpm add retriv code-chunk
-```
+## Quick Start - Local Hybrid Search
 
-## Quick Start
+```bash
+# code-chunk for AST parsing, sqlite-vec for vector storage, transformers-js for local embeddings
+pnpm add code-chunk sqlite-vec @huggingface/transformers-js
+```
 
 ```ts
 import { createRetriv } from 'retriv'
+import { autoChunker } from 'retriv/chunkers/auto'
 import sqlite from 'retriv/db/sqlite'
-import { transformers } from 'retriv/embeddings/transformers'
+import { transformersJs } from 'retriv/embeddings/transformers-js'
 
 const search = await createRetriv({
   driver: sqlite({
     path: './search.db',
-    embeddings: transformers(), // runs locally, no API key
+    embeddings: transformersJs(),
+    chunking: autoChunker(),
   }),
 })
 
@@ -79,8 +82,8 @@ Natural language queries match semantically across both code and docs:
 ```ts
 const results = await search.search('password hashing')
 // [
-//   { id: 'src/auth.ts#chunk-2', score: 0.82, _chunk: { parentId: 'src/auth.ts', index: 2 } },
-//   { id: 'docs/guide.md#chunk-0', score: 0.71, _chunk: { parentId: 'docs/guide.md', index: 0 } },
+//   { id: 'src/auth.ts', score: 0.82 },
+//   { id: 'docs/guide.md', score: 0.71 },
 // ]
 ```
 
@@ -89,7 +92,7 @@ Code identifiers are auto-expanded for [BM25](https://en.wikipedia.org/wiki/Okap
 ```ts
 await search.search('getUserName')
 // [
-//   { id: 'src/auth.ts#chunk-1', score: 0.91, _chunk: { parentId: 'src/auth.ts', index: 1 } },
+//   { id: 'src/auth.ts', score: 0.91 },
 // ]
 ```
 
@@ -136,7 +139,27 @@ const search = await createRetriv({
 
 ### Chunking
 
-Chunking is enabled by default. Documents are split before indexing. Pass `chunking: false` to disable. The auto chunker picks strategy by file extension:
+Chunking is opt-in. Pass a chunker from `retriv/chunkers/*` to split documents before indexing:
+
+```ts
+import { autoChunker } from 'retriv/chunkers/auto'
+import { codeChunker } from 'retriv/chunkers/code'
+import { markdownChunker } from 'retriv/chunkers/markdown'
+
+// Markdown-aware splitting with configurable sizes
+chunking: markdownChunker({ chunkSize: 500, chunkOverlap: 100 })
+
+// Auto-detect by file extension (code vs markdown)
+chunking: autoChunker()
+
+// AST-aware code splitting (requires code-chunk)
+chunking: codeChunker({ maxChunkSize: 2000 })
+
+// Or pass any function matching the Chunker type
+chunking: (content, meta) => [{ text: content }]
+```
+
+The auto chunker picks strategy by file extension:
 
 | File type | Strategy | What it does |
 |-----------|----------|--------------|
@@ -145,22 +168,6 @@ Chunking is enabled by default. Documents are split before indexing. Pass `chunk
 | Everything else | Heading-aware | Falls back to markdown-style splitting |
 
 If `code-chunk` is not installed, code files fall back to markdown-style splitting.
-
-Override with a specific chunker:
-
-```ts
-import { codeChunker } from 'retriv/chunkers/code'
-import { markdownChunker } from 'retriv/chunkers/markdown'
-
-// Code only
-chunking: { chunker: await codeChunker({ maxChunkSize: 2000 }) }
-
-// Markdown only with custom sizes
-chunking: { chunker: markdownChunker({ chunkSize: 500, chunkOverlap: 100 }) }
-
-// Or pass any function matching the Chunker type
-chunking: { chunker: (content, meta) => [{ text: content }] }
-```
 
 ### Query Tokenization
 

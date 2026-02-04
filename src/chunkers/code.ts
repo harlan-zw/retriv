@@ -1,4 +1,5 @@
 import type { Chunker, ChunkerChunk } from '../types'
+import { chunk } from 'code-chunk'
 
 export interface CodeChunkerOptions {
   /** Max chunk size in characters. Default: 1500 */
@@ -15,26 +16,17 @@ export interface CodeChunkerOptions {
  *
  * Supports: TypeScript, JavaScript
  */
-export async function codeChunker(options: CodeChunkerOptions = {}): Promise<Chunker> {
+export function codeChunker(options: CodeChunkerOptions = {}): Chunker {
   const {
     maxChunkSize = 1500,
     contextMode = 'full',
     overlapLines = 0,
   } = options
 
-  let chunkFn: typeof import('code-chunk')['chunk']
-  try {
-    const mod = await import('code-chunk')
-    chunkFn = mod.chunk
-  }
-  catch {
-    throw new Error('code-chunk is required for code chunking. Install it: pnpm add code-chunk')
-  }
-
   return async (content: string, meta?: { id?: string, metadata?: Record<string, any> }): Promise<ChunkerChunk[]> => {
     const filepath = meta?.id || 'file.ts'
 
-    const chunks = await chunkFn(filepath, content, {
+    const chunks = await chunk(filepath, content, {
       maxChunkSize,
       contextMode,
       overlapLines,
@@ -44,10 +36,10 @@ export async function codeChunker(options: CodeChunkerOptions = {}): Promise<Chu
       return [{ text: content }]
     }
 
-    return chunks.map(chunk => ({
-      text: chunk.text,
-      context: chunk.contextualizedText !== chunk.text
-        ? chunk.contextualizedText.slice(0, chunk.contextualizedText.indexOf(chunk.text)).trim() || undefined
+    return chunks.map(c => ({
+      text: c.text,
+      context: c.contextualizedText !== c.text
+        ? c.contextualizedText.slice(0, c.contextualizedText.indexOf(c.text)).trim() || undefined
         : undefined,
     }))
   }
