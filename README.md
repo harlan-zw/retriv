@@ -22,7 +22,7 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 | Raw embeddings + [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity) | No keyword fallback, misses exact matches |
 | Custom [BM25](https://en.wikipedia.org/wiki/Okapi_BM25) + vector pipeline | Lots of glue code, score normalization headaches |
 
-**retriv solves this:** single `createRetriv()` call gives you hybrid search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), AST-aware code chunking, and automatic query expansion. Swap backends without changing your search code.
+**retriv solves this:** single `createRetriv()` call gives you hybrid search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), dual AND+OR keyword queries with weighted rank fusion for both precision and recall, AST-aware code chunking, and automatic query expansion. Swap backends without changing your search code.
 
 <p align="center">
 <table>
@@ -36,9 +36,9 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 
 ## Features
 
+- 🎯 **3-way hybrid fusion search** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)
 - 🌳 **AST-aware code chunking** — [tree-sitter](https://tree-sitter.github.io/) splits on function/class boundaries (TypeScript, JavaScript)
 - 🔤 **Automatic query expansion** — `camelCase`/`snake_case` identifiers tokenized for [BM25](https://en.wikipedia.org/wiki/Okapi_BM25)
-- 📂 **File-type routing** — code and markdown indexed with the right strategy automatically
 - 🔍 **Metadata filtering** — narrow results by file type, path prefix, or any custom field
 - 🔌 **Swappable backends** — SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
 

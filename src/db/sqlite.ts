@@ -5,6 +5,7 @@ import * as sqliteVecExt from 'sqlite-vec'
 import { resolveEmbedding } from '../embeddings/resolve'
 import { compileFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
+import { buildFtsQuery, sanitizeFtsTokens } from './sqlite-fts'
 
 const RRF_K = 60
 
@@ -32,13 +33,21 @@ export interface SqliteConfig {
 /**
  * Apply Reciprocal Rank Fusion to merge results
  */
-function applyRRF(ftsResults: SearchResult[], vecResults: SearchResult[]): SearchResult[] {
+interface WeightedResultSet {
+  results: SearchResult[]
+  weight?: number
+}
+
+function applyRRF(sets: (SearchResult[] | WeightedResultSet)[]): SearchResult[] {
   const scores = new Map<string, { score: number, result: SearchResult }>()
 
-  for (const [results] of [[ftsResults], [vecResults]]) {
+  for (const set of sets) {
+    const results = Array.isArray(set) ? set : set.results
+    const weight = Array.isArray(set) ? 1 : (set.weight ?? 1)
+
     for (let rank = 0; rank < results.length; rank++) {
       const result = results[rank]!
-      const rrfScore = 1 / (RRF_K + rank + 1)
+      const rrfScore = weight / (RRF_K + rank + 1)
       const existing = scores.get(result.id)
 
       if (existing) {
@@ -194,9 +203,13 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
       const ftsFilter = compileFilter(filter, 'json', 'meta')
       const vecFilter = compileFilter(filter, 'json')
 
-      // FTS5 search — JOIN with documents_meta for native metadata filtering
+      // FTS5 search — run AND + OR queries, fuse via RRF for precision + recall
+      const tokens = sanitizeFtsTokens(query)
+      const andQuery = buildFtsQuery(tokens, 'and')
+      const orQuery = buildFtsQuery(tokens, 'or')
       const ftsFilterWhere = ftsFilter.sql ? `AND ${ftsFilter.sql}` : ''
-      const ftsRows = db.prepare(`
+
+      const ftsStmt = db.prepare(`
         SELECT fts.id, meta.content, meta.metadata, bm25(documents_fts, 0, 2.0, 1.0, 0) as score
         FROM documents_fts fts
         INNER JOIN documents_meta meta ON fts.id = meta.id
@@ -204,14 +217,10 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
         ${ftsFilterWhere}
         ORDER BY bm25(documents_fts, 0, 2.0, 1.0, 0)
         LIMIT ?
-      `).all(query, ...ftsFilter.params, fetchLimit) as Array<{
-        id: string
-        content: string | null
-        metadata: string | null
-        score: number
-      }>
+      `)
 
-      const ftsResults: SearchResult[] = ftsRows.map((row) => {
+      interface FtsRow { id: string, content: string | null, metadata: string | null, score: number }
+      const mapFtsRows = (rows: FtsRow[]): SearchResult[] => rows.map((row) => {
         const result: SearchResult = {
           id: row.id,
           score: Math.max(0, Math.min(1, 1 / (1 + Math.abs(row.score)))),
@@ -226,6 +235,14 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
           result.metadata = JSON.parse(row.metadata)
         return result
       })
+
+      const ftsAndResults = andQuery
+        ? mapFtsRows(ftsStmt.all(andQuery, ...ftsFilter.params, fetchLimit) as unknown as FtsRow[])
+        : []
+      // Only run OR if multi-token (single token = same as AND)
+      const ftsOrResults = orQuery && orQuery !== andQuery
+        ? mapFtsRows(ftsStmt.all(orQuery, ...ftsFilter.params, fetchLimit) as unknown as FtsRow[])
+        : []
 
       // Vector search — rowid IN subquery for native metadata filtering
       const [embedding] = await embedder([query])
@@ -268,8 +285,13 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
         return result
       }).filter(Boolean) as SearchResult[]
 
-      // RRF fusion — both sides already pre-filtered
-      const merged = applyRRF(ftsResults, vecResults)
+      // RRF fusion — AND (precision) + OR (recall, downweighted) + vector (semantic)
+      const ftsResultSets: (SearchResult[] | WeightedResultSet)[] = []
+      if (ftsAndResults.length)
+        ftsResultSets.push(ftsAndResults)
+      if (ftsOrResults.length)
+        ftsResultSets.push({ results: ftsOrResults, weight: 0.5 })
+      const merged = applyRRF([...ftsResultSets, vecResults])
       return merged.slice(0, limit)
     },
 

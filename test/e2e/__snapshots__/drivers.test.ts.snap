@@ -33,27 +33,27 @@ exports[`snapshots > results for "components" 1`] = `
     {
       "id": "doc-234",
       "preview": "## Custom Directories  By default, only the \`~/components\` directory is scanned.",
-      "score": "0.445",
+      "score": "0.438",
     },
     {
       "id": "doc-238",
       "preview": "::  ::read-more{to="https://nuxt.com/docs/4.x/api/components/client-only"} You c",
-      "score": "0.446",
+      "score": "0.439",
     },
     {
       "id": "doc-237",
       "preview": "\`\`\`ts [nuxt.config.ts] twoslash export default defineNuxtConfig({   components: ",
-      "score": "0.447",
+      "score": "0.440",
+    },
+    {
+      "id": "doc-157",
+      "preview": "import { expect, it } from 'vitest' // ---cut--- // tests/components/SomeCompone",
+      "score": "0.442",
     },
     {
       "id": "doc-223",
       "preview": "  # components  Nuxt automatically imports any components in this directory (alo",
-      "score": "0.449",
-    },
-    {
-      "id": "doc-241",
-      "preview": " ::warning Most features for server-only components and island components, such ",
-      "score": "0.449",
+      "score": "0.442",
     },
   ],
   "sqlite-vec": [
@@ -119,27 +119,27 @@ exports[`snapshots > results for "routing" 1`] = `
     {
       "id": "doc-267",
       "preview": "s/users-[group\\\\]/[id\\\\].vue] <template>   <p>{{ $route.params.group }} - {{ $ro",
-      "score": "0.304",
-    },
-    {
-      "id": "doc-488",
-      "preview": "# Custom Routing  ## Adding custom routes",
-      "score": "0.306",
+      "score": "0.302",
     },
     {
       "id": "doc-270",
       "preview": "\`\`\`  :link-example{to="https://nuxt.com/docs/4.x/examples/routing/pages"}  ## Ro",
-      "score": "0.306",
-    },
-    {
-      "id": "doc-47",
-      "preview": "</NuxtLink></li>         <li><NuxtLink to="/posts/2">Post 2</NuxtLink></li>     ",
-      "score": "0.307",
+      "score": "0.304",
     },
     {
       "id": "doc-191",
       "preview": "� See [PR #31507](https://github.com/nuxt/nuxt/pull/31507){rel="&#x22;nofollow&#",
-      "score": "0.307",
+      "score": "0.305",
+    },
+    {
+      "id": "doc-488",
+      "preview": "# Custom Routing  ## Adding custom routes",
+      "score": "0.305",
+    },
+    {
+      "id": "doc-309",
+      "preview": "PI in your pages and components:  \`\`\`vue [app/pages/index.vue] <script setup lan",
+      "score": "0.305",
     },
   ],
   "sqlite-vec": [
@@ -223,9 +223,9 @@ exports[`snapshots > results for "server" 1`] = `
       "score": "0.540",
     },
     {
-      "id": "doc-389",
-      "preview": "# Server Engine  While building Nuxt, we created a new server engine: [Nitro](ht",
-      "score": "0.540",
+      "id": "doc-371",
+      "preview": "The goal of this chapter is to provide a high-level overview of the different pa",
+      "score": "0.541",
     },
   ],
   "sqlite-vec": [
@@ -291,27 +291,27 @@ exports[`snapshots > results for "state management" 1`] = `
     {
       "id": "doc-112",
       "preview": "## Using third-party libraries  Nuxt **used to rely** on the Vuex library to pro",
-      "score": "0.085",
+      "score": "0.025",
     },
     {
       "id": "doc-106",
       "preview": "\`\`\`  :link-example{to="https://nuxt.com/docs/4.x/examples/features/state-managem",
-      "score": "0.093",
+      "score": "0.024",
     },
     {
       "id": "doc-107",
       "preview": ""https://nuxt.com/docs/4.x/examples/features/state-management"}  ::note",
-      "score": "0.097",
+      "score": "0.024",
     },
     {
       "id": "doc-105",
       "preview": "# State Management  Nuxt provides the [\`useState\`](https://nuxt.com/docs/4.x/api",
-      "score": "0.099",
+      "score": "0.023",
     },
     {
-      "id": "doc-111",
-      "preview": ":link-example{to="https://nuxt.com/docs/4.x/examples/advanced/locale"}  ## Share",
-      "score": "0.105",
+      "id": "doc-382",
+      "preview": "## Built-in Auto-imports  Nuxt auto-imports functions and composables to perform",
+      "score": "0.023",
     },
   ],
   "sqlite-vec": [
