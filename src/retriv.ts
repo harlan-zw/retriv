@@ -1,4 +1,4 @@
-import type { ComposedDriver, Document, DriverInput, RetrivOptions, SearchOptions, SearchProvider, SearchResult } from './types'
+import type { ChunkEntity, ComposedDriver, Document, DriverInput, RetrivOptions, SearchOptions, SearchProvider, SearchResult } from './types'
 import { tokenizeCodeQuery } from './utils/code-tokenize'
 
 const RRF_K = 60
@@ -86,6 +86,7 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
           const content = chunk.context
             ? `${chunk.context}\n${chunk.text}`
             : chunk.text
+
           chunkedDocs.push({
             id: `${doc.id}#chunk-${i}`,
             content,
@@ -94,6 +95,9 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
               _parentId: doc.id,
               _chunkIndex: i,
               _chunkRange: chunk.range,
+              _chunkLineRange: chunk.lineRange,
+              ...(chunk.entities?.length && { _chunkEntities: chunk.entities }),
+              ...(chunk.scope?.length && { _chunkScope: chunk.scope }),
             },
           })
         }
@@ -112,9 +116,12 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
       const parentId = metadata._parentId as string | undefined
       const chunkIndex = metadata._chunkIndex as number | undefined
       const chunkRange = metadata._chunkRange as [number, number] | undefined
+      const chunkLineRange = metadata._chunkLineRange as [number, number] | undefined
+      const chunkEntities = metadata._chunkEntities as ChunkEntity[] | undefined
+      const chunkScope = metadata._chunkScope as ChunkEntity[] | undefined
 
       if (parentId !== undefined && chunkIndex !== undefined) {
-        const { _parentId, _chunkIndex, _chunkRange, ...cleanMeta } = metadata
+        const { _parentId, _chunkIndex, _chunkRange, _chunkLineRange, _chunkEntities, _chunkScope, ...cleanMeta } = metadata
         return {
           ...result,
           metadata: Object.keys(cleanMeta).length > 0 ? cleanMeta : undefined,
@@ -122,6 +129,9 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
             parentId,
             index: chunkIndex,
             range: chunkRange,
+            lineRange: chunkLineRange,
+            entities: chunkEntities,
+            scope: chunkScope,
           },
         }
       }

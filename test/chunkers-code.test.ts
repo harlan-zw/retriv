@@ -28,7 +28,17 @@ export function useToggle(initial = false) {
     expect(chunks.length).toBeGreaterThanOrEqual(1)
     for (const chunk of chunks) {
       expect(chunk.text.length).toBeGreaterThan(0)
+      // Should have line ranges
+      if (chunk.lineRange) {
+        expect(chunk.lineRange[0]).toBeTypeOf('number')
+        expect(chunk.lineRange[1]).toBeTypeOf('number')
+      }
     }
+    // At least one chunk should have entities
+    const withEntities = chunks.filter(c => c.entities?.length)
+    expect(withEntities.length).toBeGreaterThanOrEqual(1)
+    expect(withEntities[0]!.entities![0]).toHaveProperty('name')
+    expect(withEntities[0]!.entities![0]).toHaveProperty('type')
   })
 
   it('returns single chunk for small files', async () => {
@@ -65,5 +75,14 @@ export class UserService {
     // With full context, chunks should have context property
     const chunksWithContext = chunks.filter(c => c.context)
     expect(chunksWithContext.length).toBeGreaterThanOrEqual(0)
+    // Should have scope info (methods inside UserService)
+    const withScope = chunks.filter(c => c.scope?.length)
+    if (withScope.length > 0) {
+      expect(withScope[0]!.scope![0]!.name).toBe('UserService')
+    }
+    // Should have imports
+    const withImports = chunks.filter(c => c.imports?.length)
+    expect(withImports.length).toBeGreaterThanOrEqual(1)
+    expect(withImports[0]!.imports![0]).toHaveProperty('source')
   })
 })

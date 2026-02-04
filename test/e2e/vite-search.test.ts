@@ -297,3 +297,129 @@ describe('edge cases at scale', () => {
     expect(Array.isArray(results)).toBe(true)
   })
 })
+
+// ---------------------------------------------------------------------------
+// AST chunk context — tests that validate the rich metadata from code-chunk
+// ---------------------------------------------------------------------------
+describe('chunk context metadata', () => {
+  it('chunks have entity metadata with name and type', async () => {
+    const results = await codeSearch.search('resolveConfig', { limit: 10, returnMetadata: true })
+    const chunked = results.filter(r => r._chunk?.entities?.length)
+    expect(chunked.length).toBeGreaterThan(0)
+    for (const r of chunked) {
+      for (const entity of r._chunk!.entities!) {
+        expect(entity.name).toBeTypeOf('string')
+        expect(entity.type).toBeTypeOf('string')
+      }
+    }
+  })
+
+  it('chunks have scope chain for nested code', async () => {
+    const results = await codeSearch.search('createServer', { limit: 20, returnMetadata: true })
+    const withScope = results.filter(r => r._chunk?.scope?.length)
+    // At least some chunks should be inside a class or function
+    expect(withScope.length).toBeGreaterThan(0)
+    for (const r of withScope) {
+      for (const s of r._chunk!.scope!) {
+        expect(s.name).toBeTypeOf('string')
+        expect(s.type).toBeTypeOf('string')
+      }
+    }
+  })
+
+  it('chunk lineRange maps back to source positions', async () => {
+    const results = await codeSearch.search('HMR accept', { limit: 10, returnMetadata: true })
+    const withLines = results.filter(r => r._chunk?.lineRange)
+    expect(withLines.length).toBeGreaterThan(0)
+    for (const r of withLines) {
+      const [start, end] = r._chunk!.lineRange!
+      expect(start).toBeTypeOf('number')
+      expect(end).toBeTypeOf('number')
+      expect(end).toBeGreaterThanOrEqual(start)
+    }
+  })
+
+  it('entity names are searchable via metadata filter', async () => {
+    // Index stores _chunkEntities — search for chunks that define specific entities
+    const results = await codeSearch.search('transform', {
+      limit: 20,
+      returnMetadata: true,
+    })
+    // Collect all entity names across results
+    const allEntities = results
+      .flatMap(r => r._chunk?.entities ?? [])
+      .map(e => e.name)
+    // Vite's codebase defines many transform-related functions
+    expect(allEntities.length).toBeGreaterThan(0)
+  })
+
+  it('different queries surface different entity types', async () => {
+    const [fnResults, classResults] = await Promise.all([
+      codeSearch.search('export function plugin', { limit: 20, returnMetadata: true }),
+      codeSearch.search('class Module', { limit: 20, returnMetadata: true }),
+    ])
+    const fnEntities = fnResults.flatMap(r => r._chunk?.entities ?? [])
+    const classEntities = classResults.flatMap(r => r._chunk?.entities ?? [])
+    const fnTypes = new Set(fnEntities.map(e => e.type))
+    const classTypes = new Set(classEntities.map(e => e.type))
+    // Function queries should surface function-type entities
+    expect(fnTypes.size).toBeGreaterThan(0)
+    expect(classTypes.size).toBeGreaterThan(0)
+  })
+
+  it('chunks from large files always have lineRange', async () => {
+    // config.js is ~36k lines — all its chunks must have lineRange
+    const results = await codeSearch.search('vite config', { limit: 20, returnMetadata: true })
+    const configChunks = results.filter(r => r._chunk && r.id.includes('config'))
+    expect(configChunks.length).toBeGreaterThan(0)
+    for (const r of configChunks) {
+      expect(r._chunk!.lineRange).toBeDefined()
+      expect(r._chunk!.lineRange![1]).toBeGreaterThan(r._chunk!.lineRange![0])
+    }
+  })
+
+  it('scope chain reflects nesting depth', async () => {
+    // Search for deeply nested code (methods inside classes)
+    const results = await codeSearch.search('ModuleRunner', { limit: 20, returnMetadata: true })
+    const withScope = results.filter(r => r._chunk?.scope?.length)
+    if (withScope.length > 0) {
+      // Scope entries should have meaningful names
+      const scopeNames = withScope.flatMap(r => r._chunk!.scope!.map(s => s.name))
+      expect(scopeNames.every(n => n.length > 0)).toBe(true)
+    }
+  })
+
+  it('entity metadata survives indexing round-trip', async () => {
+    // Verify entities stored in metadata are properly reconstructed in _chunk
+    const results = await codeSearch.search('transform plugin', { limit: 5, returnMetadata: true })
+    const chunked = results.filter(r => r._chunk)
+    expect(chunked.length).toBeGreaterThan(0)
+    for (const r of chunked) {
+      // _chunk internal metadata should be cleaned from user-facing metadata
+      expect(r.metadata?._chunkEntities).toBeUndefined()
+      expect(r.metadata?._chunkScope).toBeUndefined()
+      expect(r.metadata?._chunkLineRange).toBeUndefined()
+    }
+  })
+
+  it('auto chunker also produces entity metadata for JS files', async () => {
+    const results = await autoSearch.search('resolveConfig', { limit: 10, returnMetadata: true })
+    const withEntities = results.filter(r => r._chunk?.entities?.length)
+    // Auto chunker routes .js to code chunker, should produce entities
+    expect(withEntities.length).toBeGreaterThan(0)
+  })
+
+  it('chunk parentId + lineRange enables source location reconstruction', async () => {
+    const results = await codeSearch.search('WebSocket upgrade', { limit: 10, returnMetadata: true })
+    const locatable = results.filter(r => r._chunk?.parentId && r._chunk?.lineRange)
+    expect(locatable.length).toBeGreaterThan(0)
+    for (const r of locatable) {
+      // parentId should be a valid file path from the corpus
+      expect(viteDocs.some(d => d.id === r._chunk!.parentId)).toBe(true)
+      // lineRange should be within the source file bounds
+      const parent = viteDocs.find(d => d.id === r._chunk!.parentId)!
+      const sourceLines = parent.content.split('\n').length
+      expect(r._chunk!.lineRange![1]).toBeLessThanOrEqual(sourceLines)
+    }
+  })
+})

@@ -38,7 +38,7 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 
 - 🎯 **3-way hybrid fusion search** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)
 - 📦 **Zero infrastructure** — single SQLite file, no servers, ~1.4 kB gzipped core
-- 🌳 **AST-aware code chunking** — powered by [`code-chunk`](https://github.com/supermemoryai/code-chunk), uses [tree-sitter](https://tree-sitter.github.io/) to split on function/class boundaries (TypeScript, JavaScript)
+- 🌳 **AST-aware code chunking** — powered by [`code-chunk`](https://github.com/supermemoryai/code-chunk), uses [tree-sitter](https://tree-sitter.github.io/) to split on function/class boundaries with entity, scope, and import metadata (TypeScript, JavaScript, Python, Rust, Go, Java)
 - 🔍 **Search filtering** — narrow results by file type, path prefix, or any custom field
 - 🔌 **Swappable backends** — SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
 
@@ -93,7 +93,12 @@ const results = await search.search('password hashing', { returnContent: true })
 //   {
 //     id: 'src/auth.ts#chunk-2', score: 0.82,
 //     content: 'async function hashPassword(raw: string) {\n  ...',
-//     _chunk: { parentId: 'src/auth.ts', index: 2, range: [140, 312] },
+//     _chunk: {
+//       parentId: 'src/auth.ts', index: 2,
+//       range: [140, 312], lineRange: [12, 28],
+//       entities: [{ name: 'hashPassword', type: 'function' }],
+//       scope: [{ name: 'AuthService', type: 'class' }],
+//     },
 //   },
 //   {
 //     id: 'docs/guide.md#chunk-0', score: 0.71,
@@ -166,7 +171,13 @@ chunking: markdownChunker({ chunkSize: 500, chunkOverlap: 100 })
 chunking: autoChunker()
 
 // AST-aware code splitting (requires code-chunk)
-chunking: codeChunker({ maxChunkSize: 2000 })
+chunking: codeChunker({
+  maxChunkSize: 2000,
+  contextMode: 'full', // 'none' | 'minimal' | 'full'
+  siblingDetail: 'signatures', // 'none' | 'names' | 'signatures'
+  filterImports: false,
+  overlapLines: 0,
+})
 
 // Or pass any function matching the Chunker type
 chunking: (content, meta) => [{ text: content }]
@@ -177,6 +188,10 @@ The auto chunker picks strategy by file extension:
 | File type | Strategy | What it does |
 |-----------|----------|--------------|
 | `.ts` `.tsx` `.js` `.jsx` `.mjs` `.mts` `.cjs` `.cts` | tree-sitter AST | Splits on function/class boundaries, preserves scope context |
+| `.py` `.pyi` | tree-sitter AST | Python functions, classes, methods |
+| `.rs` | tree-sitter AST | Rust functions, structs, impls |
+| `.go` | tree-sitter AST | Go functions, structs, methods |
+| `.java` | tree-sitter AST | Java classes, methods, interfaces |
 | `.md` `.mdx` | Heading-aware | Splits on headings with configurable overlap |
 | Everything else | Heading-aware | Falls back to markdown-style splitting |
 
@@ -343,8 +358,44 @@ interface SearchResult {
   score: number // 0-1, higher is better
   content?: string // If returnContent: true
   metadata?: Record<string, any> // If returnMetadata: true
-  _chunk?: ChunkInfo // When chunking enabled: { parentId, index, range }
+  _chunk?: ChunkInfo // When chunking enabled (see below)
   _meta?: SearchMeta // If returnMeta: true (driver-specific extras)
+}
+```
+
+### ChunkInfo
+
+When chunking is enabled, each result includes `_chunk` with source mapping and AST metadata:
+
+```ts
+interface ChunkInfo {
+  parentId: string // Original document ID
+  index: number // Chunk position (0-based)
+  range?: [number, number] // Character range in original content
+  lineRange?: [number, number] // Line range in original content
+  entities?: ChunkEntity[] // Functions, classes, methods defined in this chunk
+  scope?: ChunkEntity[] // Containing scope chain (e.g. class this method is inside)
+}
+
+interface ChunkEntity {
+  name: string // e.g. "hashPassword"
+  type: string // e.g. "function", "class", "method"
+  signature?: string // e.g. "async hashPassword(raw: string): Promise<string>"
+  isPartial?: boolean // true if entity was split across chunks
+}
+```
+
+Code chunks also produce `imports` and `siblings` on the `ChunkerChunk` level (available when writing custom chunkers):
+
+```ts
+interface ChunkerChunk {
+  text: string
+  lineRange?: [number, number]
+  context?: string // Contextualized prefix for embeddings
+  entities?: ChunkEntity[]
+  scope?: ChunkEntity[]
+  imports?: ChunkImport[] // { name, source, isDefault?, isNamespace? }
+  siblings?: ChunkSibling[] // { name, type, position: 'before'|'after', distance }
 }
 ```
 

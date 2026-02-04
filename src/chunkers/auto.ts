@@ -13,6 +13,11 @@ const CODE_EXTENSIONS = new Set([
   'jsx',
   'mjs',
   'cjs',
+  'py',
+  'pyi',
+  'rs',
+  'go',
+  'java',
 ])
 
 /**

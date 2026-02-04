@@ -17,6 +17,11 @@ export interface ChunkInfo {
   parentId: string
   index: number
   range?: [number, number]
+  lineRange?: [number, number]
+  /** Entities defined in this chunk */
+  entities?: ChunkEntity[]
+  /** Scope chain for this chunk */
+  scope?: ChunkEntity[]
 }
 
 /**
@@ -215,14 +220,54 @@ export interface TextNativeDriverConfig extends BaseDriverConfig {
 }
 
 /**
+ * Entity info extracted from AST-aware chunking
+ */
+export interface ChunkEntity {
+  name: string
+  type: string
+  signature?: string
+  isPartial?: boolean
+}
+
+/**
+ * Import info extracted from AST-aware chunking
+ */
+export interface ChunkImport {
+  name: string
+  source: string
+  isDefault?: boolean
+  isNamespace?: boolean
+}
+
+/**
+ * Sibling entity info for context around a chunk
+ */
+export interface ChunkSibling {
+  name: string
+  type: string
+  position: 'before' | 'after'
+  distance: number
+}
+
+/**
  * A chunk produced by a chunker function
  */
 export interface ChunkerChunk {
   text: string
   /** Character range [start, end] in original content */
   range?: [number, number]
+  /** Line range [start, end] in original content */
+  lineRange?: [number, number]
   /** Optional context to prepend for embedding (file path, scope, imports) */
   context?: string
+  /** Entities defined in this chunk (functions, classes, methods, etc.) */
+  entities?: ChunkEntity[]
+  /** Scope chain from innermost to outermost containing entity */
+  scope?: ChunkEntity[]
+  /** Imports referenced by this chunk */
+  imports?: ChunkImport[]
+  /** Sibling entities before/after this chunk */
+  siblings?: ChunkSibling[]
 }
 
 /**
