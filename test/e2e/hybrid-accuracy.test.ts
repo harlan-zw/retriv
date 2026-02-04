@@ -46,7 +46,7 @@ describe('hybrid accuracy comparison', () => {
         vector: sqliteVec({ path: ':memory:', embeddings }),
       },
       categories: doc =>
-        /^(#|export |import |function |const |type |interface |\w+\()/.test(doc.content.trim())
+        /^(?:#|export |import |function |const |type |interface |\w+\()/.test(doc.content.trim())
           ? 'code'
           : 'docs',
     })

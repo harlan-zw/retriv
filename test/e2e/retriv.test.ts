@@ -232,7 +232,7 @@ describe('split-category search', () => {
   it('infers categories from document properties', async () => {
     const search = await createRetriv({
       driver: sqlite({ path: ':memory:', embeddings }),
-      categories: (doc: Document) => /\.(ts|js)$/.test(doc.id) ? 'code' : 'docs',
+      categories: (doc: Document) => /\.(?:ts|js)$/.test(doc.id) ? 'code' : 'docs',
     })
 
     await search.index([
