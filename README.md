@@ -38,7 +38,7 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 
 - 🎯 **3-way hybrid fusion search** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)
 - 📦 **Zero infrastructure** — single SQLite file, no servers, ~1.4 kB gzipped core
-- 🌳 **AST-aware code chunking** — [tree-sitter](https://tree-sitter.github.io/) splits on function/class boundaries (TypeScript, JavaScript)
+- 🌳 **AST-aware code chunking** — powered by [`code-chunk`](https://github.com/supermemoryai/code-chunk), uses [tree-sitter](https://tree-sitter.github.io/) to split on function/class boundaries (TypeScript, JavaScript)
 - 🔍 **Search filtering** — narrow results by file type, path prefix, or any custom field
 - 🔌 **Swappable backends** — SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
 
