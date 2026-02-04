@@ -63,6 +63,9 @@ catalogs:
     obuild:
       specifier: ^0.4.22
       version: 0.4.22
+    osgrep:
+      specifier: ^0.5.16
+      version: 0.5.16
     pg:
       specifier: ^8.18.0
       version: 8.18.0
@@ -145,7 +148,7 @@ importers:
         specifier: 'catalog:'
         version: 0.4.22(magicast@0.5.1)(typescript@5.9.3)
       osgrep:
-        specifier: ^0.5.16
+        specifier: 'catalog:'
         version: 0.5.16(hono@4.11.7)
       pg:
         specifier: 'catalog:'
