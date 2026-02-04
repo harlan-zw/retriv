@@ -32,13 +32,12 @@ describe('hybrid accuracy comparison', () => {
       },
     })
 
-    const reranker = await crossEncoder()
     const hybridReranked = await createRetriv({
       driver: {
         keyword: sqliteFts({ path: ':memory:' }),
         vector: sqliteVec({ path: ':memory:', embeddings }),
       },
-      rerank: reranker,
+      rerank: crossEncoder(),
     })
 
     // Index all

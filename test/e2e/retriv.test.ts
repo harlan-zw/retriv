@@ -167,7 +167,7 @@ describe('unified sqlite driver', () => {
 
     const search = await createRetriv({
       driver: sqlite({ path: ':memory:', embeddings }),
-      rerank: reranker,
+      rerank: { resolve: async () => reranker },
     })
 
     await search.index([
