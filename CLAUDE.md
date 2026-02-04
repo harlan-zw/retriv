@@ -56,7 +56,7 @@ pnpm typecheck       # TypeScript check
 
 ### Key Files
 
-- `src/retriv.ts` - `createRetriv()` factory: multi-driver fusion (RRF k=60), opt-in chunking
+- `src/retriv.ts` - `createRetriv()` factory: multi-driver fusion (RRF k=60), opt-in chunking, split-category search
 - `src/db/sqlite.ts` - Single-file hybrid driver with built-in RRF fusion
 - `src/filter.ts` - Filter compilation (SQL for sqlite/pg) and in-memory matching
 - `src/utils/split-text.ts` - Text chunking for large documents
@@ -90,6 +90,14 @@ Chunking is opt-in via `createRetriv({ chunking: markdownChunker() })`. When ena
 - Chunk metadata (`_parentId`, `_chunkIndex`, `_chunkRange`) is attached
 - Results include `_chunk: { parentId, index, range }` for reassembly
 - Code queries are auto-tokenized (e.g. `getUserName` → `get User Name getUserName`)
+
+### Split-Category Search
+
+Opt-in via `createRetriv({ categories: (doc) => string })`. When enabled:
+- Documents are auto-tagged with `metadata.category` at index time
+- Search fans out per-category with filtered queries, results fused with RRF
+- Prevents one category (e.g. prose) from drowning out another (e.g. code)
+- Works with composed drivers (double RRF: inner driver fusion + outer category fusion)
 
 ### Test Infrastructure
 

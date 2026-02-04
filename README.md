@@ -36,7 +36,7 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 
 ## Features
 
-- 🎯 **Hybrid search + reranking** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), with optional cross-encoder reranking for even better precision
+- 🎯 **Hybrid search + reranking** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), with optional cross-encoder reranking and per-category fusion
 - 📦 **Local to cloud** — start with a single SQLite file, scale to cloud providers for vectors, embeddings, and reranking
 - 🌳 **AST-aware code chunking** — powered by [`code-chunk`](https://github.com/supermemoryai/code-chunk), uses [tree-sitter](https://tree-sitter.github.io/) to split on function/class boundaries with entity, scope, and import metadata
 - 🔍 **Search filtering** — narrow results by file type, path prefix, or any custom field
@@ -143,6 +143,40 @@ rerank: async (query, results) => {
   return reranked
 }
 ```
+
+### Split-Category Search
+
+When one category of documents (e.g. prose docs) outnumbers another (e.g. code definitions), the majority can drown out minority results. Split-category search fixes this by running parallel filtered searches per category and fusing with RRF — each category gets equal representation regardless of volume.
+
+```ts
+const search = await createRetriv({
+  driver: sqlite({ path: './search.db', embeddings: transformersJs() }),
+  categories: doc => doc.metadata?.type || 'other',
+})
+
+await search.index([
+  { id: 'src/auth.ts', content: authCode, metadata: { type: 'code' } },
+  { id: 'docs/guide.md', content: guide, metadata: { type: 'docs' } },
+  { id: 'docs/api.md', content: apiRef, metadata: { type: 'docs' } },
+])
+
+// Code results won't be buried by docs, even when outnumbered
+await search.search('authentication')
+```
+
+The `categories` function receives each document at index time and returns a category string. The category is stored in `metadata.category` automatically. At search time, one query runs per seen category and results are fused with RRF.
+
+Categories can be derived from any document property:
+
+```ts
+// By file extension
+categories: doc => /\.(?:ts|js)$/.test(doc.id) ? 'code' : 'docs'
+
+// By explicit metadata
+categories: doc => doc.metadata?.category
+```
+
+Works with reranking — the reranker runs on the fused result set after category merging.
 
 ### Cloud Embeddings
 
