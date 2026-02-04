@@ -21,32 +21,36 @@ function collectFiles(dir: string, out: { id: string, content: string }[] = []) 
   return out
 }
 
-const docs = collectFiles(VITE_DIST)
-const totalKB = docs.reduce((a, d) => a + d.content.length, 0) / 1024
-console.log(`Corpus: ${docs.length} files, ${totalKB.toFixed(0)}KB`)
+async function main() {
+  const docs = collectFiles(VITE_DIST)
+  const totalKB = docs.reduce((a, d) => a + d.content.length, 0) / 1024
+  console.log(`Corpus: ${docs.length} files, ${totalKB.toFixed(0)}KB`)
 
-// Clean slate
-rmSync(DB_PATH, { force: true })
+  // Clean slate
+  rmSync(DB_PATH, { force: true })
 
-// Warm up transformers.js model download (exclude from timing)
-console.log('Warming up embedding model...')
-const embeddings = transformersJs({ model: 'Xenova/bge-small-en-v1.5' })
-const warmupProvider = await sqlite({ path: ':memory:', embeddings })
-await warmupProvider.index([{ id: 'warmup', content: 'warmup' }])
-await warmupProvider.close?.()
-console.log('Model ready\n')
+  // Warm up transformers.js model download (exclude from timing)
+  console.log('Warming up embedding model...')
+  const embeddings = transformersJs({ model: 'Xenova/bge-small-en-v1.5' })
+  const warmupProvider = await sqlite({ path: ':memory:', embeddings })
+  await warmupProvider.index([{ id: 'warmup', content: 'warmup' }])
+  await warmupProvider.close?.()
+  console.log('Model ready\n')
 
-// Hybrid: FTS5 + vector embeddings
-const retriv = await createRetriv({
-  driver: sqlite({ path: DB_PATH, embeddings }),
-  chunking: codeChunker(),
-})
-await retriv.index(docs)
+  // Hybrid: FTS5 + vector embeddings
+  const retriv = await createRetriv({
+    driver: sqlite({ path: DB_PATH, embeddings }),
+    chunking: codeChunker(),
+  })
+  await retriv.index(docs)
 
-// Verify it's real
-const dbSize = statSync(DB_PATH).size
-const hits = await retriv.search('function', { limit: 3 })
-console.log(`DB: ${(dbSize / 1024).toFixed(0)}KB, test query: ${hits.length} results`)
+  // Verify it's real
+  const dbSize = statSync(DB_PATH).size
+  const hits = await retriv.search('function', { limit: 3 })
+  console.log(`DB: ${(dbSize / 1024).toFixed(0)}KB, test query: ${hits.length} results`)
 
-await retriv.close?.()
-rmSync(DB_PATH, { force: true })
+  await retriv.close?.()
+  rmSync(DB_PATH, { force: true })
+}
+
+main()

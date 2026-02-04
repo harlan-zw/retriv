@@ -1,5 +1,5 @@
 shellEmulator: true
-
+trustPolicy: no-downgrade
 
 catalog:
   '@ai-sdk/cohere': ^3.0.18
