@@ -52,10 +52,14 @@ For code search (AST-aware chunking):
 
 ## Quick Start - Local Hybrid Search
 
+1. Install extra dependencies:
+
 ```bash
 # code-chunk for AST parsing, sqlite-vec for vector storage, transformers-js for local embeddings
 pnpm add code-chunk sqlite-vec @huggingface/transformers-js
 ```
+
+2. Create your retriv search instance:
 
 ```ts
 import { createRetriv } from 'retriv'
@@ -67,32 +71,41 @@ const search = await createRetriv({
   driver: sqlite({
     path: './search.db',
     embeddings: transformersJs(),
-    chunking: autoChunker(),
+    chunking: autoChunker(), // code + markdown-aware splitting
   }),
 })
+```
 
+3. Index documents:
+
+```ts
 await search.index([
-  { id: 'src/auth.ts', content: authFileContents },
-  { id: 'docs/guide.md', content: guideContents },
+  { id: 'src/auth.ts', content: authFileContents, metadata: { type: 'code', lang: 'typescript' } },
+  { id: 'docs/guide.md', content: guideContents, metadata: { type: 'docs' } },
 ])
 ```
 
-Natural language queries match semantically across both code and docs:
-
+4. Search!
 ```ts
-const results = await search.search('password hashing')
+// hybrid search finds both code and docs
+const results = await search.search('password hashing', { returnContent: true })
 // [
-//   { id: 'src/auth.ts', score: 0.82 },
-//   { id: 'docs/guide.md', score: 0.71 },
+//   {
+//     id: 'src/auth.ts#chunk-2', score: 0.82,
+//     content: 'async function hashPassword(raw: string) {\n  ...',
+//     _chunk: { parentId: 'src/auth.ts', index: 2, range: [140, 312] },
+//   },
+//   {
+//     id: 'docs/guide.md#chunk-0', score: 0.71,
+//     content: '## Password Hashing\n\nUse bcrypt with...',
+//     _chunk: { parentId: 'docs/guide.md', index: 0, range: [0, 487] },
+//   },
 // ]
-```
 
-Code identifiers are auto-expanded for [BM25](https://en.wikipedia.org/wiki/Okapi_BM25) (`getUserName` → `"get User Name getUserName"`):
-
-```ts
-await search.search('getUserName')
+// filter to just code files
+await search.search('getUserName', { filter: { type: 'code' } })
 // [
-//   { id: 'src/auth.ts', score: 0.91 },
+//   { id: 'src/auth.ts#chunk-0', score: 0.91, _chunk: { parentId: 'src/auth.ts', index: 0, range: [0, 139] } },
 // ]
 ```
 
