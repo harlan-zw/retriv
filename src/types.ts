@@ -167,6 +167,7 @@ export type EmbeddingProvider = (texts: string[]) => Promise<number[][]>
 export interface ResolvedEmbedding {
   embedder: EmbeddingProvider
   dimensions: number
+  maxTokens?: number
 }
 
 /**

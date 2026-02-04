@@ -1,7 +1,7 @@
 import type { EmbeddingConfig, EmbeddingProvider, ResolvedEmbedding } from '../types'
 import { rm } from 'node:fs/promises'
 import { env, pipeline } from '@huggingface/transformers'
-import { getModelDimensions, resolveModelForPreset } from './model-info'
+import { getModelDimensions, getModelMaxTokens, resolveModelForPreset } from './model-info'
 
 export interface TransformersEmbeddingOptions {
   /** Model name (e.g., 'bge-base-en-v1.5' or 'Xenova/bge-base-en-v1.5') */
@@ -62,16 +62,20 @@ export function transformersJs(options: TransformersEmbeddingOptions = {}): Embe
       if (!dimensions)
         throw new Error(`Unknown dimensions for model ${model}. Please specify dimensions option.`)
 
+      const BATCH_SIZE = 64
       const embedder: EmbeddingProvider = async (texts) => {
         const results: number[][] = []
-        for (const text of texts) {
-          const output = await extractor(text, { pooling: 'mean', normalize: true })
-          results.push(Array.from(output.data as Float32Array))
+        for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+          const batch = texts.slice(i, i + BATCH_SIZE)
+          const output = await extractor(batch, { pooling: 'mean', normalize: true })
+          const data = output.data as Float32Array
+          for (let j = 0; j < batch.length; j++)
+            results.push(Array.from(data.subarray(j * dimensions, (j + 1) * dimensions)))
         }
         return results
       }
 
-      cached = { embedder, dimensions }
+      cached = { embedder, dimensions, maxTokens: getModelMaxTokens(model) }
       return cached
     },
   }

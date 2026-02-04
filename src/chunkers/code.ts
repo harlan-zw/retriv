@@ -2,8 +2,10 @@ import type { Chunker, ChunkerChunk } from '../types'
 import { chunk } from 'code-chunk'
 
 export interface CodeChunkerOptions {
-  /** Max chunk size in bytes. Default: 1500 */
+  /** Max chunk size in bytes. Default: 1000 (or derived from maxTokens) */
   maxChunkSize?: number
+  /** Model max token window — used to derive maxChunkSize when not set (~3.5 chars/token, 85% headroom) */
+  maxTokens?: number
   /** Context mode: 'none' | 'minimal' | 'full'. Default: 'full' */
   contextMode?: 'none' | 'minimal' | 'full'
   /** Level of sibling detail: 'none' | 'names' | 'signatures'. Default: 'signatures' */
@@ -22,7 +24,8 @@ export interface CodeChunkerOptions {
  */
 export function codeChunker(options: CodeChunkerOptions = {}): Chunker {
   const {
-    maxChunkSize = 1500,
+    maxTokens,
+    maxChunkSize = maxTokens ? Math.floor(maxTokens * 3.5 * 0.85) : 1000,
     contextMode = 'full',
     siblingDetail = 'signatures',
     filterImports = false,

@@ -56,6 +56,32 @@ export const MODEL_DIMENSIONS: Record<string, number> = {
 }
 
 /**
+ * Known max token windows for common models
+ */
+export const MODEL_MAX_TOKENS: Record<string, number> = {
+  // OpenAI
+  'text-embedding-3-small': 8191,
+  'text-embedding-3-large': 8191,
+  'text-embedding-ada-002': 8191,
+  // Google
+  'text-embedding-004': 2048,
+  // Mistral
+  'mistral-embed': 16384,
+  // Cohere
+  'embed-english-v3.0': 512,
+  // Ollama / local
+  'nomic-embed-text': 8192,
+  // BGE family
+  'bge-small-en-v1.5': 512,
+  'bge-base-en-v1.5': 512,
+  'bge-large-en-v1.5': 512,
+  'bge-m3': 8192,
+  // Other common
+  'all-MiniLM-L6-v2': 256,
+  'embeddinggemma-300m': 512,
+}
+
+/**
  * Get dimensions for a model (returns undefined if unknown)
  */
 export function getModelDimensions(model: string): number | undefined {
@@ -66,6 +92,16 @@ export function getModelDimensions(model: string): number | undefined {
   // Strip common prefixes (Xenova/, onnx-community/, etc)
   const normalized = model.replace(/^(Xenova\/|onnx-community\/)/, '')
   return MODEL_DIMENSIONS[normalized]
+}
+
+/**
+ * Get max token window for a model (returns undefined if unknown)
+ */
+export function getModelMaxTokens(model: string): number | undefined {
+  if (MODEL_MAX_TOKENS[model])
+    return MODEL_MAX_TOKENS[model]
+  const normalized = model.replace(/^(Xenova\/|onnx-community\/)/, '')
+  return MODEL_MAX_TOKENS[normalized]
 }
 
 /**
