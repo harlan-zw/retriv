@@ -87,6 +87,14 @@
       "types": "./dist/chunkers/auto.d.mts",
       "import": "./dist/chunkers/auto.mjs"
     },
+    "./rerankers/transformers-js": {
+      "types": "./dist/rerankers/transformers-js.d.mts",
+      "import": "./dist/rerankers/transformers-js.mjs"
+    },
+    "./rerankers/cohere": {
+      "types": "./dist/rerankers/cohere.d.mts",
+      "import": "./dist/rerankers/cohere.mjs"
+    },
     "./utils/code-tokenize": {
       "types": "./dist/utils/code-tokenize.d.mts",
       "import": "./dist/utils/code-tokenize.mjs"

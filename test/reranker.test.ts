@@ -1,5 +1,6 @@
 import type { SearchResult } from '../src/types'
 import { describe, expect, it } from 'vitest'
+import { cohereReranker } from '../src/rerankers/cohere'
 import { crossEncoder } from '../src/rerankers/transformers-js'
 
 describe('cross-encoder reranker', () => {
@@ -37,5 +38,18 @@ describe('cross-encoder reranker', () => {
     ]
     const reranked = await reranker('test', results)
     expect(reranked).toHaveLength(2)
+  })
+})
+
+describe('cohere reranker', () => {
+  it('exports a RerankerConfig factory', () => {
+    const config = cohereReranker()
+    expect(config).toHaveProperty('resolve')
+    expect(typeof config.resolve).toBe('function')
+  })
+
+  it('accepts model and apiKey options', () => {
+    const config = cohereReranker({ model: 'rerank-v3.5', apiKey: 'test-key' })
+    expect(config).toHaveProperty('resolve')
   })
 })
