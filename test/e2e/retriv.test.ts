@@ -1,3 +1,4 @@
+import type { Document } from '../../src/types'
 import { describe, expect, it, vi } from 'vitest'
 import { markdownChunker } from '../../src/chunkers/markdown'
 import { sqlite } from '../../src/db/sqlite'
@@ -192,5 +193,78 @@ describe('unified sqlite driver', () => {
 
     const results = await search.search('neural networks', { limit: 5 })
     expect(results.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('split-category search', () => {
+  it('prevents one category from drowning out another', async () => {
+    const search = await createRetriv({
+      driver: sqlite({ path: ':memory:', embeddings }),
+      categories: (doc: Document) => doc.metadata?.category as string || 'other',
+    })
+
+    // 3 docs matching "authentication" in docs, 1 in code
+    // Without categories, code result would be buried
+    await search.index([
+      { id: 'fn-auth', content: 'function authenticate(user, pass) { return jwt.sign(user) }', metadata: { category: 'code' } },
+      { id: 'guide-auth', content: 'Authentication guide: use JWT tokens for stateless auth. Configure middleware for route protection.', metadata: { category: 'docs' } },
+      { id: 'guide-security', content: 'Security best practices for authentication and authorization in web applications.', metadata: { category: 'docs' } },
+      { id: 'guide-jwt', content: 'JSON Web Tokens tutorial: creating, verifying, and refreshing authentication tokens.', metadata: { category: 'docs' } },
+    ])
+
+    const results = await search.search('authentication', {
+      limit: 4,
+      returnMetadata: true,
+    })
+
+    // Code result should appear despite being outnumbered 3:1 by docs
+    const categories = results.map(r => r.metadata?.category)
+    expect(categories).toContain('code')
+    expect(categories).toContain('docs')
+
+    // Code result should be in top 2 (RRF gives it high rank within its category)
+    const codeRank = results.findIndex(r => r.metadata?.category === 'code')
+    expect(codeRank).toBeLessThanOrEqual(1)
+
+    await search.close?.()
+  })
+
+  it('infers categories from document properties', async () => {
+    const search = await createRetriv({
+      driver: sqlite({ path: ':memory:', embeddings }),
+      categories: (doc: Document) => /\.(ts|js)$/.test(doc.id) ? 'code' : 'docs',
+    })
+
+    await search.index([
+      { id: 'auth.ts', content: 'export function authenticate(user: string) { return true }' },
+      { id: 'guide.md', content: 'Authentication setup guide for the project' },
+    ])
+
+    const results = await search.search('authenticate', {
+      returnMetadata: true,
+    })
+
+    expect(results.length).toBeGreaterThanOrEqual(1)
+    // verify auto-tagging worked
+    for (const r of results) {
+      expect(r.metadata?.category).toMatch(/^(code|docs)$/)
+    }
+
+    await search.close?.()
+  })
+
+  it('falls back to normal search without categories', async () => {
+    const search = await createRetriv({
+      driver: sqlite({ path: ':memory:', embeddings }),
+    })
+
+    await search.index([
+      { id: '1', content: 'hello world', metadata: { category: 'docs' } },
+    ])
+
+    const results = await search.search('hello')
+    expect(results).toHaveLength(1)
+
+    await search.close?.()
   })
 })
