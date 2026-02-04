@@ -1,245 +1,131 @@
-import type { ChildProcess } from 'node:child_process'
-import type { SearchProvider } from '../../src/types'
-import { spawn } from 'node:child_process'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { codeChunker } from '../../src/chunkers/code'
-import { sqliteFts } from '../../src/db/sqlite-fts'
-import { createRetriv } from '../../src/retriv'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Corpus — same as vite-search.test.ts
+// Load pre-generated results (run: pnpx tsx test/e2e/generate-bench-results.ts)
 // ---------------------------------------------------------------------------
-const VITE_DIST = join(import.meta.dirname, '../../node_modules/vite/dist')
-const LIMIT = 10
+const RESULTS_FILE = join(import.meta.dirname, 'bench-results.json')
 
-function collectFiles(dir: string, out: { id: string, content: string }[] = []) {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry)
-    const st = statSync(full)
-    if (st.isDirectory())
-      collectFiles(full, out)
-    else if (/\.(?:js|mjs|cjs)$/.test(entry))
-      out.push({ id: relative(VITE_DIST, full), content: readFileSync(full, 'utf-8') })
-  }
-  return out
+interface Result { id: string, content: string, score: number, relevant: boolean }
+interface BenchQuery { query: string, keywords: string[], category: string, expectFile?: string }
+interface BenchData {
+  queries: BenchQuery[]
+  results: Record<string, { retriv: Result[], osgrep: Result[] | null }>
 }
 
-const viteDocs = collectFiles(VITE_DIST)
-
-// ---------------------------------------------------------------------------
-// Queries with expected keywords
-// ---------------------------------------------------------------------------
-interface BenchQuery {
-  query: string
-  keywords: string[]
-  category: 'concept' | 'ranking' | 'cross-file'
-  expectFile?: string
+function loadResults(): BenchData {
+  if (!existsSync(RESULTS_FILE))
+    throw new Error(`Missing ${RESULTS_FILE} — run: pnpx tsx test/e2e/generate-bench-results.ts`)
+  return JSON.parse(readFileSync(RESULTS_FILE, 'utf-8'))
 }
 
-const queries: BenchQuery[] = [
-  // Concept-level — words may not appear literally
-  { query: 'hot module replacement', keywords: ['hmr', 'hot'], category: 'concept' },
-  { query: 'dependency optimization pre-bundling', keywords: ['optimiz', 'pre-bundle', 'esbuild'], category: 'concept' },
-  { query: 'source map generation', keywords: ['sourcemap', 'source-map', 'magicstring'], category: 'concept' },
-  { query: 'CSS processing transform postcss', keywords: ['css', 'postcss', 'stylesheet'], category: 'concept' },
-  { query: 'proxy middleware server configuration', keywords: ['proxy', 'middleware', 'server'], category: 'concept' },
-  { query: 'WebSocket connection', keywords: ['websocket', 'socket', 'ws'], category: 'concept' },
-  { query: 'module resolution resolve algorithm', keywords: ['resolve', 'resolv'], category: 'concept' },
-  { query: 'rollup plugin hooks transform load', keywords: ['plugin', 'hook', 'transform', 'load'], category: 'concept' },
-  { query: 'file watcher chokidar', keywords: ['watch', 'chokidar', 'fswatcher'], category: 'concept' },
-  { query: 'environment variables env define', keywords: ['env', 'import.meta.env', 'define'], category: 'concept' },
-
-  // Ranking — expect specific file in top 3
-  { query: 'resolveConfig', keywords: ['config'], category: 'ranking', expectFile: 'config' },
-  { query: 'optimizedDepsPlugin', keywords: ['config'], category: 'ranking', expectFile: 'config' },
-  { query: 'ModuleRunner evaluate', keywords: ['module-runner', 'client'], category: 'ranking', expectFile: 'module-runner' },
-
-  // Cross-file — expect specific file in results
-  { query: 'command line interface argv build serve preview', keywords: ['cli'], category: 'cross-file', expectFile: 'cli' },
-  { query: 'HMR accept dispose prune', keywords: ['client'], category: 'cross-file', expectFile: 'client' },
-]
-
 // ---------------------------------------------------------------------------
-// Helpers
+// Scoring helpers
 // ---------------------------------------------------------------------------
-interface NormalizedResult {
-  id: string
-  content: string
-  score: number
+function countRelevant(results: Result[]): number {
+  return results.filter(r => r.relevant).length
 }
 
-function scoreKeywordHits(results: NormalizedResult[], keywords: string[]): number {
-  return results.filter(r =>
-    keywords.some(kw => r.content.toLowerCase().includes(kw.toLowerCase())),
-  ).length
-}
-
-function hasFileInTop(results: NormalizedResult[], expectFile: string, topN = 3): boolean {
+function hasFileInTop(results: Result[], expectFile: string, topN = 3): boolean {
   return results.slice(0, topN).some(r => r.id.toLowerCase().includes(expectFile))
 }
 
-// ---------------------------------------------------------------------------
-// osgrep HTTP helpers
-// ---------------------------------------------------------------------------
-const OSGREP_PORT = 14444 + Math.floor(Math.random() * 1000)
-
-async function osgrepSearch(query: string, limit: number): Promise<NormalizedResult[]> {
-  const res = await fetch(`http://localhost:${OSGREP_PORT}/search`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, limit }),
-  })
-  if (!res.ok)
-    throw new Error(`osgrep search failed: ${res.status}`)
-  const data = await res.json() as { results: Array<{ path?: string, file?: string, content?: string, snippet?: string, text?: string, score?: number }> }
-  return (data.results || []).map(r => ({
-    id: relative(VITE_DIST, r.path || r.file || ''),
-    content: r.text || r.content || r.snippet || '',
-    score: r.score ?? 0,
-  }))
+function ndcg(results: Result[]): number {
+  const dcg = results.reduce((sum, r, i) =>
+    sum + (r.relevant ? 1 : 0) / Math.log2(i + 2), 0)
+  const nRelevant = results.filter(r => r.relevant).length
+  if (nRelevant === 0)
+    return 0
+  const idcg = Array.from({ length: nRelevant }, (_, i) =>
+    1 / Math.log2(i + 2)).reduce((a, b) => a + b, 0)
+  return dcg / idcg
 }
 
-async function waitForOsgrep(timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch(`http://localhost:${OSGREP_PORT}/health`)
-      if (res.ok)
-        return true
-    }
-    catch {}
-    await new Promise(r => setTimeout(r, 2000))
-  }
-  return false
+function reciprocalRank(results: Result[], expectFile: string): number {
+  const idx = results.findIndex(r => r.id.toLowerCase().includes(expectFile))
+  return idx === -1 ? 0 : 1 / (idx + 1)
 }
 
 // ---------------------------------------------------------------------------
-// Test
+// Tests
 // ---------------------------------------------------------------------------
 describe('retriv vs osgrep', () => {
-  let retriv: SearchProvider
-  let osgrepProc: ChildProcess | null = null
-  let osgrepAvailable = false
+  const data = loadResults()
+  const osgrepAvailable = Object.values(data.results).some(r => r.osgrep !== null)
 
-  beforeAll(async () => {
-    // 1. Index retriv
-    retriv = await createRetriv({
-      driver: sqliteFts({ path: ':memory:' }),
-      chunking: codeChunker(),
-    })
-    await retriv.index(viteDocs)
+  it('concept query relevance (LLM-judged)', () => {
+    const conceptQueries = data.queries.filter(q => q.category === 'concept')
+    const scores: { query: string, retriv: number, osgrep: number | null, retrivTotal: number, osgrepTotal: number, retrivNDCG: number, osgrepNDCG: number | null }[] = []
 
-    // 2. Spawn osgrep serve
-    try {
-      osgrepProc = spawn('pnpm', ['dlx', 'osgrep', 'serve', '--port', String(OSGREP_PORT)], {
-        cwd: VITE_DIST,
-        stdio: 'pipe',
+    for (const { query } of conceptQueries) {
+      const r = data.results[query]
+      scores.push({
+        query,
+        retriv: countRelevant(r.retriv),
+        osgrep: r.osgrep ? countRelevant(r.osgrep) : null,
+        retrivTotal: r.retriv.length,
+        osgrepTotal: r.osgrep?.length ?? 0,
+        retrivNDCG: ndcg(r.retriv),
+        osgrepNDCG: r.osgrep ? ndcg(r.osgrep) : null,
       })
-      osgrepProc.on('error', () => { osgrepAvailable = false })
-
-      // 3. Wait for health + warm-up
-      osgrepAvailable = await waitForOsgrep(180_000)
-      if (osgrepAvailable) {
-        // Warm-up query triggers indexing
-        await osgrepSearch('test', 1).catch(() => {})
-      }
     }
-    catch {
-      console.log('osgrep not available, will show retriv-only results')
-    }
-  }, 300_000)
 
-  afterAll(async () => {
-    await retriv?.close?.()
-    if (osgrepProc && !osgrepProc.killed)
-      osgrepProc.kill()
+    console.log('\n=== Concept Query Relevance (LLM-judged) ===\n')
+    for (const s of scores) {
+      const rPrec = s.retrivTotal > 0 ? (s.retriv / s.retrivTotal * 100).toFixed(0) : '0'
+      const oPrec = s.osgrepTotal > 0 ? ((s.osgrep ?? 0) / s.osgrepTotal * 100).toFixed(0) : 'N/A'
+      const osPart = s.osgrep !== null ? `osgrep: ${oPrec}% (${s.osgrep}/${s.osgrepTotal}) nDCG: ${s.osgrepNDCG!.toFixed(3)}` : 'osgrep: N/A'
+      console.log(`  "${s.query}"\n    retriv: ${rPrec}% (${s.retriv}/${s.retrivTotal}) nDCG: ${s.retrivNDCG.toFixed(3)}  ${osPart}`)
+    }
+
+    const retrivRelevant = scores.reduce((a, s) => a + s.retriv, 0)
+    const retrivTotal = scores.reduce((a, s) => a + s.retrivTotal, 0)
+    const retrivPrecision = retrivTotal > 0 ? (retrivRelevant / retrivTotal * 100).toFixed(1) : '0'
+    const retrivMeanNDCG = scores.reduce((a, s) => a + s.retrivNDCG, 0) / scores.length
+    console.log(`\n  retriv: ${retrivPrecision}% precision (${retrivRelevant}/${retrivTotal})  nDCG: ${retrivMeanNDCG.toFixed(3)}`)
+    if (osgrepAvailable) {
+      const osgrepRelevant = scores.reduce((a, s) => a + (s.osgrep ?? 0), 0)
+      const osgrepTotal = scores.reduce((a, s) => a + s.osgrepTotal, 0)
+      const osgrepPrecision = osgrepTotal > 0 ? (osgrepRelevant / osgrepTotal * 100).toFixed(1) : '0'
+      const osgrepMeanNDCG = scores.reduce((a, s) => a + (s.osgrepNDCG ?? 0), 0) / scores.length
+      console.log(`  osgrep: ${osgrepPrecision}% precision (${osgrepRelevant}/${osgrepTotal})  nDCG: ${osgrepMeanNDCG.toFixed(3)}`)
+    }
+
+    expect(retrivRelevant).toBeGreaterThan(0)
   })
 
-  it('concept query relevance', async () => {
-    const conceptQueries = queries.filter(q => q.category === 'concept')
-    const scores: { query: string, retriv: number, osgrep: number | null }[] = []
-
-    for (const { query, keywords } of conceptQueries) {
-      const retrivResults = await retriv.search(query, { limit: LIMIT, returnContent: true })
-      const retrivNorm: NormalizedResult[] = retrivResults.map(r => ({
-        id: r.id,
-        content: r.content || '',
-        score: r.score,
-      }))
-
-      let osgrepScore: number | null = null
-      if (osgrepAvailable) {
-        const osgrepResults = await osgrepSearch(query, LIMIT).catch(() => [] as NormalizedResult[])
-        osgrepScore = scoreKeywordHits(osgrepResults, keywords)
-      }
-
-      scores.push({
-        query,
-        retriv: scoreKeywordHits(retrivNorm, keywords),
-        osgrep: osgrepScore,
-      })
-    }
-
-    // Print
-    console.log('\n=== Concept Query Relevance (keyword hits in top-%d) ===\n', LIMIT)
-    for (const s of scores) {
-      const osPart = s.osgrep !== null ? `osgrep: ${s.osgrep}/${LIMIT}` : 'osgrep: N/A'
-      console.log(`  "${s.query}"\n    retriv: ${s.retriv}/${LIMIT}  ${osPart}`)
-    }
-
-    const retrivTotal = scores.reduce((a, s) => a + s.retriv, 0)
-    const maxTotal = conceptQueries.length * LIMIT
-    console.log(`\n  retriv total: ${retrivTotal}/${maxTotal}`)
-    if (osgrepAvailable) {
-      const osgrepTotal = scores.reduce((a, s) => a + (s.osgrep ?? 0), 0)
-      console.log(`  osgrep total: ${osgrepTotal}/${maxTotal}`)
-    }
-
-    expect(retrivTotal).toBeGreaterThan(0)
-  }, 120_000)
-
-  it('ranking & cross-file accuracy', async () => {
-    const fileQueries = queries.filter(q => q.expectFile)
-    const scores: { query: string, retriv: boolean, osgrep: boolean | null }[] = []
+  it('ranking & cross-file accuracy', () => {
+    const fileQueries = data.queries.filter(q => q.expectFile)
+    const scores: { query: string, retriv: boolean, osgrep: boolean | null, retrivRR: number, osgrepRR: number | null }[] = []
 
     for (const { query, expectFile } of fileQueries) {
-      const retrivResults = await retriv.search(query, { limit: 5, returnContent: true })
-      const retrivNorm: NormalizedResult[] = retrivResults.map(r => ({
-        id: r.id,
-        content: r.content || '',
-        score: r.score,
-      }))
-
-      let osgrepHit: boolean | null = null
-      if (osgrepAvailable) {
-        const osgrepResults = await osgrepSearch(query, 5).catch(() => [] as NormalizedResult[])
-        osgrepHit = hasFileInTop(osgrepResults, expectFile!, 3)
-      }
-
+      const r = data.results[query]
       scores.push({
         query,
-        retriv: hasFileInTop(retrivNorm, expectFile!, 3),
-        osgrep: osgrepHit,
+        retriv: hasFileInTop(r.retriv, expectFile!, 3),
+        osgrep: r.osgrep ? hasFileInTop(r.osgrep, expectFile!, 3) : null,
+        retrivRR: reciprocalRank(r.retriv, expectFile!),
+        osgrepRR: r.osgrep ? reciprocalRank(r.osgrep, expectFile!) : null,
       })
     }
 
-    // Print
     console.log('\n=== Ranking Accuracy (expected file in top-3) ===\n')
     for (const s of scores) {
       const rv = s.retriv ? '✓' : '✗'
       const os = s.osgrep === null ? 'N/A' : s.osgrep ? '✓' : '✗'
-      console.log(`  "${s.query}"\n    retriv: ${rv}  osgrep: ${os}`)
+      console.log(`  "${s.query}"\n    retriv: ${rv} (RR ${s.retrivRR.toFixed(3)})  osgrep: ${os}${s.osgrepRR !== null ? ` (RR ${s.osgrepRR.toFixed(3)})` : ''}`)
     }
 
     const retrivHits = scores.filter(s => s.retriv).length
-    console.log(`\n  retriv: ${retrivHits}/${fileQueries.length}`)
+    const retrivMRR = scores.reduce((a, s) => a + s.retrivRR, 0) / scores.length
+    console.log(`\n  retriv: ${retrivHits}/${fileQueries.length}  MRR: ${retrivMRR.toFixed(3)}`)
     if (osgrepAvailable) {
       const osgrepHits = scores.filter(s => s.osgrep).length
-      console.log(`  osgrep: ${osgrepHits}/${fileQueries.length}`)
+      const osgrepMRR = scores.reduce((a, s) => a + (s.osgrepRR ?? 0), 0) / scores.length
+      console.log(`  osgrep: ${osgrepHits}/${fileQueries.length}  MRR: ${osgrepMRR.toFixed(3)}`)
     }
 
     expect(retrivHits).toBeGreaterThan(0)
-  }, 60_000)
+  })
 })
