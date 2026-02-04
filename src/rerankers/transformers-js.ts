@@ -1,44 +1,62 @@
-import type { Reranker, SearchResult } from '../types'
+import type { Reranker, RerankerConfig, SearchResult } from '../types'
+
+/** Well-known cross-encoder models compatible with transformers.js */
+export type CrossEncoderModel
+  = | 'Xenova/ms-marco-MiniLM-L-6-v2'
+    | 'Xenova/ms-marco-MiniLM-L-12-v2'
+    | 'mixedbread-ai/mxbai-rerank-xsmall-v1'
+    | 'mixedbread-ai/mxbai-rerank-base-v1'
+    | 'Xenova/bge-reranker-base'
+    | 'Xenova/bge-reranker-large'
+    | (string & {})
 
 export interface CrossEncoderConfig {
-  /** Model name (default: 'Xenova/ms-marco-MiniLM-L-6-v2') */
-  model?: string
+  /** Cross-encoder model name */
+  model?: CrossEncoderModel
 }
 
-/**
- * Create a cross-encoder reranker using transformers.js
- */
-export async function crossEncoder(config: CrossEncoderConfig = {}): Promise<Reranker> {
+export function crossEncoder(config: CrossEncoderConfig = {}): RerankerConfig {
   const { model = 'Xenova/ms-marco-MiniLM-L-6-v2' } = config
-  const { AutoTokenizer, AutoModelForSequenceClassification } = await import('@huggingface/transformers')
+  let cached: Reranker | null = null
 
-  const tokenizer = await AutoTokenizer.from_pretrained(model)
-  const ceModel = await AutoModelForSequenceClassification.from_pretrained(model)
+  return {
+    async resolve() {
+      if (cached)
+        return cached
 
-  return async (query: string, results: SearchResult[]): Promise<SearchResult[]> => {
-    if (results.length === 0)
-      return results
+      const { AutoTokenizer, AutoModelForSequenceClassification } = await import('@huggingface/transformers')
 
-    const withContent = results.filter(r => r.content)
-    const withoutContent = results.filter(r => !r.content)
+      const tokenizer = await AutoTokenizer.from_pretrained(model)
+      const ceModel = await AutoModelForSequenceClassification.from_pretrained(model)
 
-    if (withContent.length === 0)
-      return results
+      cached = async (query: string, results: SearchResult[]): Promise<SearchResult[]> => {
+        if (results.length === 0)
+          return results
 
-    const scored = await Promise.all(withContent.map(async (result) => {
-      const inputs = await tokenizer(query, result.content, {
-        padding: true,
-        truncation: true,
-        max_length: 512,
-      })
-      const output = await ceModel(inputs)
-      const logit = output.logits.data[0]
-      const score = 1 / (1 + Math.exp(-logit))
-      return { ...result, score }
-    }))
+        const withContent = results.filter(r => r.content)
+        const withoutContent = results.filter(r => !r.content)
 
-    scored.sort((a, b) => b.score - a.score)
-    return [...scored, ...withoutContent]
+        if (withContent.length === 0)
+          return results
+
+        const scored = await Promise.all(withContent.map(async (result) => {
+          const inputs = await tokenizer(query, result.content, {
+            padding: true,
+            truncation: true,
+            max_length: 512,
+          })
+          const output = await ceModel(inputs)
+          const logit = output.logits.data[0]
+          const score = 1 / (1 + Math.exp(-logit))
+          return { ...result, score }
+        }))
+
+        scored.sort((a, b) => b.score - a.score)
+        return [...scored, ...withoutContent]
+      }
+
+      return cached
+    },
   }
 }
 
