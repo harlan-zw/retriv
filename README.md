@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/retriv?color=yellow)](https://npm.chart.dev/retriv)
 [![license](https://img.shields.io/github/license/harlan-zw/retriv?color=yellow)](https://github.com/harlan-zw/retriv/blob/main/LICENSE)
 
-> Hybrid search for code and documents. [BM25](https://en.wikipedia.org/wiki/Okapi_BM25) keyword + vector semantic search with [Reciprocal Rank Fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) for [up to 30% better recall](https://ragaboutit.com/hybrid-retrieval-for-enterprise-rag-when-to-use-bm25-vectors-or-both/) than single methods. Local first with cloud integrations.
+> Tiny local-first hybrid search for docs and code. Up to 30% better recall plus optional cloud integrations.
 
 ## Why?
 
