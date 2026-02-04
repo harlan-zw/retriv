@@ -9,3 +9,5 @@ dist
 .output
 coverage
 .retriv
+bench-results.json
+.retriv-bench.db

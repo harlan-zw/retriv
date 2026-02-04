@@ -193,6 +193,7 @@
     "code-chunk": "catalog:",
     "eslint": "catalog:",
     "obuild": "catalog:",
+    "osgrep": "^0.5.16",
     "pg": "catalog:",
     "sqlite-vec": "catalog:",
     "typescript": "catalog:",

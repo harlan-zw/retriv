@@ -36,8 +36,8 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 
 ## Features
 
-- 🎯 **Hybrid search + reranking** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), with optional cross-encoder reranking and per-category fusion
-- 📦 **Local to cloud** — start with a single SQLite file, scale to cloud providers for vectors, embeddings, and reranking
+- 🎯 **Hybrid search** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), with per-category fusion
+- 📦 **Local to cloud** — start with a single SQLite file, scale to cloud providers for vectors and embeddings
 - 🌳 **AST-aware code chunking** — powered by [`code-chunk`](https://github.com/supermemoryai/code-chunk), uses [tree-sitter](https://tree-sitter.github.io/) to split on function/class boundaries with entity, scope, and import metadata
 - 🔍 **Search filtering** — narrow results by file type, path prefix, or any custom field
 - 🔌 **Swappable backends** — SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
@@ -66,7 +66,6 @@ import { createRetriv } from 'retriv'
 import { autoChunker } from 'retriv/chunkers/auto'
 import sqlite from 'retriv/db/sqlite'
 import { transformersJs } from 'retriv/embeddings/transformers-js'
-import { crossEncoder } from 'retriv/rerankers/transformers-js'
 
 const search = await createRetriv({
   driver: sqlite({
@@ -74,7 +73,6 @@ const search = await createRetriv({
     embeddings: transformersJs(),
   }),
   chunking: autoChunker(), // code + markdown-aware splitting
-  rerank: await crossEncoder(), // cross-encoder reranking for better precision
 })
 ```
 
@@ -116,34 +114,6 @@ await search.search('getUserName', { filter: { type: 'code' } })
 // ]
 ```
 
-### Reranking
-
-Add a cross-encoder reranking pass after fusion. The reranker re-scores candidates using query-document attention, improving precision on top results:
-
-```ts
-import { crossEncoder } from 'retriv/rerankers/transformers-js'
-
-const search = await createRetriv({
-  driver: sqlite({
-    path: './search.db',
-    embeddings: transformersJs(),
-  }),
-  rerank: await crossEncoder(), // local cross-encoder, no API key
-})
-```
-
-The reranker automatically over-fetches 3x candidates, re-scores them, then trims to your requested `limit`. Results without content are passed through unchanged.
-
-You can also pass any function matching `(query: string, results: SearchResult[]) => Promise<SearchResult[]>`:
-
-```ts
-// Custom reranker (e.g. Cohere rerank API)
-rerank: async (query, results) => {
-  const reranked = await cohereRerank(query, results)
-  return reranked
-}
-```
-
 ### Split-Category Search
 
 When one category of documents (e.g. prose docs) outnumbers another (e.g. code definitions), the majority can drown out minority results. Split-category search fixes this by running parallel filtered searches per category and fusing with RRF — each category gets equal representation regardless of volume.
@@ -175,8 +145,6 @@ categories: doc => /\.(?:ts|js)$/.test(doc.id) ? 'code' : 'docs'
 // By explicit metadata
 categories: doc => doc.metadata?.category
 ```
-
-Works with reranking — the reranker runs on the fused result set after category merging.
 
 ### Cloud Embeddings
 
@@ -461,18 +429,6 @@ interface ChunkerChunk {
   imports?: ChunkImport[] // { name, source, isDefault?, isNamespace? }
   siblings?: ChunkSibling[] // { name, type, position: 'before'|'after', distance }
 }
-```
-
-## Rerankers
-
-| Reranker | Import | Peer Dependencies |
-|----------|--------|-------------------|
-| Cross-encoder | `retriv/rerankers/transformers-js` | `@huggingface/transformers` |
-
-```ts
-// Local cross-encoder (default: Xenova/ms-marco-MiniLM-L-6-v2)
-await crossEncoder()
-await crossEncoder({ model: 'Xenova/ms-marco-MiniLM-L-6-v2' })
 ```
 
 ## Related

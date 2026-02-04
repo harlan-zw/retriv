@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Generates benchmark results for retriv vs osgrep.
+ * Generates benchmark results for retriv (hybrid + rerank) vs osgrep.
  * Run: pnpx tsx test/e2e/generate-bench-results.ts
  * Output: test/e2e/bench-results.json
  */
@@ -10,7 +10,9 @@ import { join, relative } from 'node:path'
 import { generateText } from 'ai'
 import { createGeminiProvider } from 'ai-sdk-provider-gemini-cli'
 import { codeChunker } from '../../src/chunkers/code'
-import { sqliteFts } from '../../src/db/sqlite-fts'
+import { sqlite } from '../../src/db/sqlite'
+import { transformersJs } from '../../src/embeddings/transformers-js'
+import { crossEncoder } from '../../src/rerankers/transformers-js'
 import { createRetriv } from '../../src/retriv'
 
 const gemini = createGeminiProvider({ authType: 'oauth-personal' })
@@ -151,29 +153,54 @@ Output ONLY a JSON array of relevant indices, e.g. [0, 2, 4]. No explanation.`,
 }
 
 // ---------------------------------------------------------------------------
+// Search helpers
+// ---------------------------------------------------------------------------
+function expandChunkContent(results: Result[], viteDocs: { id: string, content: string }[]) {
+  return results.map((r) => {
+    const baseFile = r.id.replace(/#chunk-\d+$/, '')
+    const doc = viteDocs.find(d => d.id === baseFile)
+    if (!doc)
+      return r
+    const idx = doc.content.indexOf(r.content.slice(0, 80))
+    if (idx === -1)
+      return r
+    const start = Math.max(0, idx - 100)
+    const end = Math.min(doc.content.length, idx + r.content.length + 100)
+    return { ...r, content: doc.content.slice(start, end) }
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
   const viteDocs = collectFiles(VITE_DIST)
   console.log(`Corpus: ${viteDocs.length} files`)
 
-  // 1. retriv
-  console.log('Indexing retriv...')
+  const embeddings = transformersJs()
+  const chunking = codeChunker()
+
+  // Hybrid (FTS5 + vector) with cross-encoder rerank
   const dbPath = join(VITE_DIST, '.retriv-bench.db')
   const needsIndex = !existsSync(dbPath)
+  console.log('Setting up retriv (hybrid + rerank)...')
   const retriv = await createRetriv({
-    driver: sqliteFts({ path: dbPath }),
-    chunking: codeChunker(),
+    driver: sqlite({ path: dbPath, embeddings }),
+    chunking,
+    rerank: crossEncoder(),
   })
+
   if (needsIndex) {
+    console.log('Indexing...')
+    const t0 = performance.now()
     await retriv.index(viteDocs)
-    console.log('  indexed')
+    console.log(`  indexed in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
   }
   else {
     console.log('  using cached index')
   }
 
-  // 2. osgrep
+  // osgrep
   let osgrepAvailable = false
   try {
     execSync('osgrep index', { cwd: VITE_DIST, timeout: 120_000, stdio: 'pipe' })
@@ -184,30 +211,17 @@ async function main() {
     console.log('osgrep: not available')
   }
 
-  // 3. Run queries + judge relevance
+  // --- Run queries + judge relevance ---
   const results: Record<string, { retriv: Result[], osgrep: Result[] | null }> = {}
 
   for (const q of queries) {
     const limit = q.category === 'concept' ? LIMIT : 5
-    console.log(`  searching: "${q.query}" (limit ${limit})`)
+    console.log(`\n  searching: "${q.query}" (limit ${limit})`)
 
     const retrivRaw = (await retriv.search(q.query, { limit: limit * 3, returnContent: true }))
       .map(r => ({ id: r.id, content: r.content || '', score: r.score, relevant: false }))
 
-    // Expand chunk content with surrounding context for fairer LLM judging
-    const retrivExpanded = retrivRaw.map((r) => {
-      const baseFile = r.id.replace(/#chunk-\d+$/, '')
-      const doc = viteDocs.find(d => d.id === baseFile)
-      if (!doc)
-        return r
-      const idx = doc.content.indexOf(r.content.slice(0, 80))
-      if (idx === -1)
-        return r
-      const start = Math.max(0, idx - 100)
-      const end = Math.min(doc.content.length, idx + r.content.length + 100)
-      return { ...r, content: doc.content.slice(start, end) }
-    })
-
+    const retrivExpanded = expandChunkContent(retrivRaw, viteDocs)
     const retrivDeduped = dedupeByFile(retrivExpanded).slice(0, limit)
 
     let osgrepDeduped: Result[] | null = null
@@ -234,7 +248,7 @@ async function main() {
 
   await retriv.close?.()
 
-  // 4. Write
+  // Write
   writeFileSync(OUT_FILE, JSON.stringify({ queries, results, generatedAt: new Date().toISOString() }, null, 2))
   console.log(`\nWrote ${OUT_FILE}`)
 }

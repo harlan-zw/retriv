@@ -1,6 +1,5 @@
 shellEmulator: true
 
-trustPolicy: no-downgrade
 catalog:
   '@ai-sdk/cohere': ^3.0.18
   '@ai-sdk/google': ^3.0.20
@@ -21,6 +20,7 @@ catalog:
   code-chunk: ^0.1.13
   eslint: ^9.39.2
   obuild: ^0.4.22
+  osgrep: ^0.5.16
   pg: ^8.18.0
   sqlite-vec: ^0.1.7-alpha.2
   typescript: ^5.9.3
