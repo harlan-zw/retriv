@@ -40,26 +40,39 @@ describe('hybrid accuracy comparison', () => {
       rerank: crossEncoder(),
     })
 
+    const hybridCategory = await createRetriv({
+      driver: {
+        keyword: sqliteFts({ path: ':memory:' }),
+        vector: sqliteVec({ path: ':memory:', embeddings }),
+      },
+      categories: doc =>
+        /^(#|export |import |function |const |type |interface |\w+\()/.test(doc.content.trim())
+          ? 'code'
+          : 'docs',
+    })
+
     // Index all
     await Promise.all([
       fts.index(subset),
       vec.index(subset),
       hybrid.index(subset),
       hybridReranked.index(subset),
+      hybridCategory.index(subset),
     ])
 
     console.log('\n=== Hybrid Search Accuracy Comparison ===\n')
     console.log(`Documents indexed: ${subset.length}`)
     console.log('')
 
-    const results: { query: string, fts: number, vec: number, hybrid: number, hybridReranked: number }[] = []
+    const results: { query: string, fts: number, vec: number, hybrid: number, hybridReranked: number, hybridCat: number }[] = []
 
     for (const { query, keywords } of testQueries) {
-      const [ftsResults, vecResults, hybridResults, hybridRerankedResults] = await Promise.all([
+      const [ftsResults, vecResults, hybridResults, hybridRerankedResults, hybridCatResults] = await Promise.all([
         fts.search(query, { limit: 5, returnContent: true }),
         vec.search(query, { limit: 5, returnContent: true }),
         hybrid.search(query, { limit: 5, returnContent: true }),
         hybridReranked.search(query, { limit: 5, returnContent: true }),
+        hybridCategory.search(query, { limit: 5, returnContent: true }),
       ])
 
       // Score: how many of top 5 results contain relevant keywords
@@ -75,14 +88,16 @@ describe('hybrid accuracy comparison', () => {
       const vecScore = scoreResults(vecResults)
       const hybridScore = scoreResults(hybridResults)
       const hybridRerankedScore = scoreResults(hybridRerankedResults)
+      const hybridCatScore = scoreResults(hybridCatResults)
 
-      results.push({ query, fts: ftsScore, vec: vecScore, hybrid: hybridScore, hybridReranked: hybridRerankedScore })
+      results.push({ query, fts: ftsScore, vec: vecScore, hybrid: hybridScore, hybridReranked: hybridRerankedScore, hybridCat: hybridCatScore })
 
       console.log(`Query: "${query}"`)
       console.log(`  FTS:      ${ftsScore}/5 relevant (top: ${ftsResults[0]?.id || 'none'})`)
       console.log(`  Vector:   ${vecScore}/5 relevant (top: ${vecResults[0]?.id || 'none'})`)
       console.log(`  Hybrid:   ${hybridScore}/5 relevant (top: ${hybridResults[0]?.id || 'none'})`)
       console.log(`  Reranked: ${hybridRerankedScore}/5 relevant (top: ${hybridRerankedResults[0]?.id || 'none'})`)
+      console.log(`  Category: ${hybridCatScore}/5 relevant (top: ${hybridCatResults[0]?.id || 'none'})`)
       console.log('')
     }
 
@@ -93,8 +108,9 @@ describe('hybrid accuracy comparison', () => {
         vec: acc.vec + r.vec,
         hybrid: acc.hybrid + r.hybrid,
         hybridReranked: acc.hybridReranked + r.hybridReranked,
+        hybridCat: acc.hybridCat + r.hybridCat,
       }),
-      { fts: 0, vec: 0, hybrid: 0, hybridReranked: 0 },
+      { fts: 0, vec: 0, hybrid: 0, hybridReranked: 0, hybridCat: 0 },
     )
 
     const maxPossible = testQueries.length * 5
@@ -104,16 +120,18 @@ describe('hybrid accuracy comparison', () => {
     console.log(`Vector total:   ${totals.vec}/${maxPossible} (${((totals.vec / maxPossible) * 100).toFixed(1)}%)`)
     console.log(`Hybrid total:   ${totals.hybrid}/${maxPossible} (${((totals.hybrid / maxPossible) * 100).toFixed(1)}%)`)
     console.log(`Reranked total: ${totals.hybridReranked}/${maxPossible} (${((totals.hybridReranked / maxPossible) * 100).toFixed(1)}%)`)
+    console.log(`Category total: ${totals.hybridCat}/${maxPossible} (${((totals.hybridCat / maxPossible) * 100).toFixed(1)}%)`)
     console.log('')
 
     // Hybrid should generally be >= best single driver
     const bestSingle = Math.max(totals.fts, totals.vec)
     console.log(`Hybrid vs best single: ${totals.hybrid >= bestSingle ? '✓ Hybrid wins/ties' : '✗ Single driver better'}`)
     console.log(`Reranked vs hybrid: ${totals.hybridReranked >= totals.hybrid ? '✓ Reranked wins/ties' : '✗ Hybrid better'}`)
+    console.log(`Category vs hybrid: ${totals.hybridCat >= totals.hybrid ? '✓ Category wins/ties' : '✗ Hybrid better'}`)
 
     // Basic assertion - hybrid shouldn't be drastically worse
     expect(totals.hybrid).toBeGreaterThanOrEqual(Math.min(totals.fts, totals.vec))
 
-    await Promise.all([fts.close?.(), vec.close?.(), hybrid.close?.(), hybridReranked.close?.()])
+    await Promise.all([fts.close?.(), vec.close?.(), hybrid.close?.(), hybridReranked.close?.(), hybridCategory.close?.()])
   }, 120000)
 })
