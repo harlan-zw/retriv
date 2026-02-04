@@ -36,11 +36,10 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 
 ## Features
 
-- 🎯 **3-way hybrid fusion search** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)
+- 🎯 **Hybrid search + reranking** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), with optional cross-encoder reranking for even better precision
 - 📦 **Local to cloud** — start with a single SQLite file, scale to cloud providers for vectors, embeddings, and reranking
 - 🌳 **AST-aware code chunking** — powered by [`code-chunk`](https://github.com/supermemoryai/code-chunk), uses [tree-sitter](https://tree-sitter.github.io/) to split on function/class boundaries with entity, scope, and import metadata
 - 🔍 **Search filtering** — narrow results by file type, path prefix, or any custom field
-- 🔄 **Optional reranking** — plug in a cross-encoder to re-score results after fusion for even better precision
 - 🔌 **Swappable backends** — SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
 
 ## Installation
