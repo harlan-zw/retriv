@@ -68,7 +68,7 @@ function getNodeName(node: ts.Node): string | undefined {
   return undefined
 }
 
-function getSignature(node: ts.Node, sourceFile: ts.SourceFile): string {
+function getSignature(node: ts.Node, _sourceFile: ts.SourceFile): string {
   // For functions, build signature manually to handle anonymous functions safely
   if (ts.isFunctionDeclaration(node)) {
     const name = node.name?.getText() || 'anonymous'
