@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.8.0",
   "packageManager": "pnpm@10.28.2",
-  "description": "Unified document retrieval for search - semantic, full-text, and fuzzy.",
+  "description": "Hybrid search for TypeScript/JavaScript projects with AST-aware chunking.",
   "author": {
     "name": "Harlan Wilton",
     "email": "harlan@harlanzw.com",
@@ -75,9 +75,9 @@
       "types": "./dist/embeddings/model-info.d.mts",
       "import": "./dist/embeddings/model-info.mjs"
     },
-    "./chunkers/code": {
-      "types": "./dist/chunkers/code.d.mts",
-      "import": "./dist/chunkers/code.mjs"
+    "./chunkers/typescript": {
+      "types": "./dist/chunkers/typescript.d.mts",
+      "import": "./dist/chunkers/typescript.mjs"
     },
     "./chunkers/markdown": {
       "types": "./dist/chunkers/markdown.d.mts",
@@ -130,7 +130,6 @@
     "@libsql/client": "^0.14.0 || ^0.15.0 || ^0.16.0 || ^0.17.0",
     "@upstash/vector": "^1.0.0",
     "ai": "^4.0.0 || ^5.0.0 || ^6.0.0",
-    "code-chunk": "^0.1.0",
     "ollama-ai-provider-v2": "^1.0.0",
     "pg": "^8.0.0",
     "sqlite-vec": "^0.1.0-alpha.0"
@@ -160,9 +159,6 @@
     "ai": {
       "optional": true
     },
-    "code-chunk": {
-      "optional": true
-    },
     "ollama-ai-provider-v2": {
       "optional": true
     },
@@ -190,7 +186,6 @@
     "ai": "catalog:",
     "ai-sdk-provider-gemini-cli": "catalog:",
     "bumpp": "catalog:",
-    "code-chunk": "catalog:",
     "eslint": "catalog:",
     "obuild": "catalog:",
     "osgrep": "catalog:",

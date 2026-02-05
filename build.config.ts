@@ -27,7 +27,7 @@ export default defineBuildConfig({
         './src/embeddings/resolve.ts',
         './src/embeddings/model-info.ts',
         // Chunkers
-        './src/chunkers/code.ts',
+        './src/chunkers/typescript.ts',
         './src/chunkers/markdown.ts',
         './src/chunkers/auto.ts',
         // Utils

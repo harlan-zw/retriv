@@ -4,25 +4,17 @@
 [![npm downloads](https://img.shields.io/npm/dm/retriv?color=yellow)](https://npm.chart.dev/retriv)
 [![license](https://img.shields.io/github/license/harlan-zw/retriv?color=yellow)](https://github.com/harlan-zw/retriv/blob/main/LICENSE)
 
-> Tiny local-first hybrid search for docs and code. Up to 30% better recall plus optional cloud integrations.
+> Hybrid search for TypeScript/JavaScript projects. AST-aware chunking, camelCase tokenization, local-first with optional cloud backends.
 
 ## Why?
 
-Most search tools force you to choose: keyword search (fast, exact matches) or vector search (semantic understanding). Neither alone is good enough for mixed codebases with both code and documentation.
+Building search for TS/JS codebases is harder than it looks:
 
-- **Keyword-only** misses semantic matches — searching "authentication" won't find `verifyCredentials()`
-- **Vector-only** misses exact identifiers — searching `getUserName` returns fuzzy matches instead of the function
-- **Code needs special handling** — `camelCase` and `snake_case` identifiers need tokenization, AST-aware chunking preserves function boundaries
+- **Keyword search** misses semantic matches — "authentication" won't find `verifyCredentials()`
+- **Vector search** misses exact identifiers — `getUserName` returns fuzzy matches instead of the function
+- **Generic chunkers** break code mid-function — you need AST-aware splitting that understands TS/JS syntax
 
-**Alternative approaches have trade-offs:**
-
-| Approach | Problem |
-|----------|---------|
-| Elasticsearch/Typesense | Heavy infrastructure for a search index |
-| Raw embeddings + [cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity) | No keyword fallback, misses exact matches |
-| Custom [BM25](https://en.wikipedia.org/wiki/Okapi_BM25) + vector pipeline | Lots of glue code, score normalization headaches |
-
-**retriv solves this:** single `createRetriv()` call gives you hybrid search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), dual AND+OR keyword queries with weighted rank fusion for both precision and recall, AST-aware code chunking, and automatic query expansion. Swap backends without changing your search code.
+**retriv is purpose-built for the JS ecosystem:** TypeScript compiler API for AST parsing (zero native deps), automatic `camelCase`/`snake_case` tokenization, hybrid BM25+vector search with [RRF fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf). Start with SQLite, scale to Turso/Upstash/Cloudflare when needed.
 
 <p align="center">
 <table>
@@ -36,11 +28,11 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 
 ## Features
 
-- 🎯 **Hybrid search** — AND keywords + OR keywords + vector semantic, merged via weighted [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf), with per-category fusion
-- 📦 **Local to cloud** — start with a single SQLite file, scale to cloud providers for vectors and embeddings
-- 🌳 **AST-aware code chunking** — powered by [`code-chunk`](https://github.com/supermemoryai/code-chunk), uses [tree-sitter](https://tree-sitter.github.io/) to split on function/class boundaries with entity, scope, and import metadata
-- 🔍 **Search filtering** — narrow results by file type, path prefix, or any custom field
-- 🔌 **Swappable backends** — SQLite, LibSQL/Turso, pgvector, Upstash, Cloudflare Vectorize
+- 🎯 **Hybrid search** — BM25 keywords + vector semantic, merged via [RRF](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)
+- 🌳 **TS/JS AST chunking** — TypeScript compiler API splits on function/class boundaries, extracts signatures and scope (zero native deps)
+- 🔤 **Code-aware tokenization** — `getUserName` → `get User Name getUserName` for better BM25 recall
+- 📦 **Local to cloud** — start with SQLite, scale to Turso/Upstash/Cloudflare
+- 🔍 **Metadata filtering** — narrow by file type, path prefix, or custom fields
 
 ## Installation
 
@@ -48,15 +40,13 @@ Most search tools force you to choose: keyword search (fast, exact matches) or v
 pnpm add retriv
 ```
 
-For code search (AST-aware chunking):
-
 ## Quick Start - Local Hybrid Search
 
 1. Install extra dependencies:
 
 ```bash
-# code-chunk for AST parsing, sqlite-vec for vector storage, transformers for local embeddings
-pnpm add code-chunk sqlite-vec @huggingface/transformers
+# sqlite-vec for vector storage, transformers for local embeddings
+pnpm add sqlite-vec @huggingface/transformers
 ```
 
 2. Create your retriv search instance:
@@ -72,7 +62,7 @@ const search = await createRetriv({
     path: './search.db',
     embeddings: transformersJs(),
   }),
-  chunking: autoChunker(), // code + markdown-aware splitting
+  chunking: autoChunker(), // TS/JS AST + markdown splitting
 })
 ```
 
@@ -193,20 +183,18 @@ Chunking is opt-in. Pass a chunker from `retriv/chunkers/*` to split documents b
 
 ```ts
 import { autoChunker } from 'retriv/chunkers/auto'
-import { codeChunker } from 'retriv/chunkers/code'
 import { markdownChunker } from 'retriv/chunkers/markdown'
+import { codeChunker } from 'retriv/chunkers/typescript'
 
 // Markdown-aware splitting with configurable sizes
 chunking: markdownChunker({ chunkSize: 500, chunkOverlap: 100 })
 
-// Auto-detect by file extension (code vs markdown)
+// Auto-detect by file extension (TS/JS → code, else → markdown)
 chunking: autoChunker()
 
-// AST-aware code splitting (requires code-chunk)
+// AST-aware code splitting (TypeScript/JavaScript only)
 chunking: codeChunker({
   maxChunkSize: 2000,
-  contextMode: 'full', // 'none' | 'minimal' | 'full'
-  siblingDetail: 'signatures', // 'none' | 'names' | 'signatures'
   filterImports: false,
   overlapLines: 0,
 })
@@ -219,15 +207,9 @@ The auto chunker picks strategy by file extension:
 
 | File type | Strategy | What it does |
 |-----------|----------|--------------|
-| `.ts` `.tsx` `.js` `.jsx` `.mjs` `.mts` `.cjs` `.cts` | tree-sitter AST | Splits on function/class boundaries, preserves scope context |
-| `.py` `.pyi` | tree-sitter AST | Python functions, classes, methods |
-| `.rs` | tree-sitter AST | Rust functions, structs, impls |
-| `.go` | tree-sitter AST | Go functions, structs, methods |
-| `.java` | tree-sitter AST | Java classes, methods, interfaces |
+| `.ts` `.tsx` `.js` `.jsx` `.mjs` `.mts` `.cjs` `.cts` | TypeScript compiler API | Splits on function/class boundaries, extracts entities, scope, imports |
 | `.md` `.mdx` | Heading-aware | Splits on headings with configurable overlap |
 | Everything else | Heading-aware | Falls back to markdown-style splitting |
-
-If `code-chunk` is not installed, code files fall back to markdown-style splitting.
 
 ### Query Tokenization
 
@@ -434,7 +416,6 @@ interface ChunkerChunk {
 ## Related
 
 - [skilld](https://github.com/harlan-zw/skilld) — Generate agent skills from npm package docs, uses retriv for search
-- [code-chunk](https://github.com/nicolo-ribaudo/tree-sitter-js) — AST-aware code chunking via tree-sitter
 
 ## Sponsors
 

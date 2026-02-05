@@ -49,10 +49,15 @@ pnpm typecheck       # TypeScript check
 - `resolve.ts` - Lazy loads and caches embedding providers, detects dimensions
 - `model-info.ts` - Model dimension registry, preset resolution (e.g. maps model names to Xenova/ prefixes)
 
+**Rerankers** (src/rerankers/):
+- `cohere.ts` - Cohere rerank API (rerank-v3.5 default)
+- `jina.ts` - Jina rerank API
+- `transformers-js.ts` - Local reranking with Transformers.js
+
 **Chunkers** (src/chunkers/):
 - `markdown.ts` - Heading-aware recursive splitting (default chunker)
-- `code.ts` - Tree-sitter AST-based via `code-chunk` package, preserves class/function context
-- `auto.ts` - Routes to code or markdown chunker based on file extension
+- `typescript.ts` - TypeScript compiler API, extracts entities/scope/imports (TS/JS only, zero native deps)
+- `auto.ts` - Routes TS/JS to typescript chunker, everything else to markdown
 
 ### Key Files
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { codeChunker } from '../../src/chunkers/code'
+import { codeChunker } from '../../src/chunkers/typescript'
 import { sqlite } from '../../src/db/sqlite'
 import { transformersJs } from '../../src/embeddings/transformers-js'
 import { createRetriv } from '../../src/retriv'

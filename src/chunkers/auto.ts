@@ -1,8 +1,8 @@
 import type { Chunker, ChunkerChunk } from '../types'
-import type { CodeChunkerOptions } from './code'
 import type { MarkdownChunkerOptions } from './markdown'
-import { codeChunker } from './code'
+import type { CodeChunkerOptions } from './typescript'
 import { markdownChunker } from './markdown'
+import { codeChunker } from './typescript'
 
 const CODE_EXTENSIONS = new Set([
   'ts',
@@ -13,11 +13,6 @@ const CODE_EXTENSIONS = new Set([
   'jsx',
   'mjs',
   'cjs',
-  'py',
-  'pyi',
-  'rs',
-  'go',
-  'java',
 ])
 
 /**

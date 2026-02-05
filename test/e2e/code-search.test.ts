@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { autoChunker } from '../../src/chunkers/auto'
-import { codeChunker } from '../../src/chunkers/code'
+import { codeChunker } from '../../src/chunkers/typescript'
 import { sqliteFts } from '../../src/db/sqlite-fts'
 import { createRetriv } from '../../src/retriv'
 
@@ -18,7 +18,7 @@ const sourceFiles: Record<string, string> = {
   'src/utils/code-tokenize.ts': readSrc('src/utils/code-tokenize.ts'),
   'src/utils/extract-snippet.ts': readSrc('src/utils/extract-snippet.ts'),
   'src/chunkers/auto.ts': readSrc('src/chunkers/auto.ts'),
-  'src/chunkers/code.ts': readSrc('src/chunkers/code.ts'),
+  'src/chunkers/typescript.ts': readSrc('src/chunkers/typescript.ts'),
   'src/chunkers/markdown.ts': readSrc('src/chunkers/markdown.ts'),
   'src/db/sqlite.ts': readSrc('src/db/sqlite.ts'),
 }

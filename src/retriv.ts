@@ -44,7 +44,7 @@ function applyRRF(resultSets: SearchResult[][]): SearchResult[] {
  * Create a unified retrieval instance
  */
 export async function createRetriv(options: RetrivOptions): Promise<SearchProvider & { _testSetCategories?: (cats: string[]) => void }> {
-  const { driver: driverInput, chunking: resolvedChunker } = options
+  const { driver: driverInput, chunking: chunker } = options
 
   // Resolve driver(s)
   let drivers: SearchProvider[]
@@ -82,13 +82,13 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
       }
     }
 
-    if (!resolvedChunker)
+    if (!chunker)
       return docs
 
     const chunkedDocs: Document[] = []
 
     for (const doc of docs) {
-      const chunks = await resolvedChunker(doc.content, { id: doc.id, metadata: doc.metadata })
+      const chunks = await chunker(doc.content, { id: doc.id, metadata: doc.metadata })
 
       if (chunks.length <= 1) {
         chunkedDocs.push(doc)
@@ -122,7 +122,7 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
   }
 
   function annotateChunks(results: SearchResult[]): SearchResult[] {
-    if (!resolvedChunker)
+    if (!chunker)
       return results
 
     return results.map((result) => {

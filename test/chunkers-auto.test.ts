@@ -12,21 +12,12 @@ describe('detectContentType', () => {
     expect(detectContentType('App.jsx')).toBe('code')
   })
 
-  it('detects Python files', () => {
-    expect(detectContentType('main.py')).toBe('code')
-    expect(detectContentType('types.pyi')).toBe('code')
-  })
-
-  it('detects Rust files', () => {
-    expect(detectContentType('lib.rs')).toBe('code')
-  })
-
-  it('detects Go files', () => {
-    expect(detectContentType('main.go')).toBe('code')
-  })
-
-  it('detects Java files', () => {
-    expect(detectContentType('App.java')).toBe('code')
+  it('treats non-JS/TS as markdown', () => {
+    // Python, Rust, Go, Java now fall back to markdown (TS compiler API only supports JS/TS)
+    expect(detectContentType('main.py')).toBe('markdown')
+    expect(detectContentType('lib.rs')).toBe('markdown')
+    expect(detectContentType('main.go')).toBe('markdown')
+    expect(detectContentType('App.java')).toBe('markdown')
   })
 
   it('detects markdown files', () => {
@@ -52,10 +43,10 @@ describe('autoChunker', () => {
     expect(chunks[0]!.text).toContain('Hello')
   })
 
-  it('falls back to markdown chunker when code-chunk unavailable', async () => {
+  it('uses code chunker for TypeScript files', async () => {
     const chunker = autoChunker()
-    // Even for .ts files, if code-chunk isn't installed, should fall back
     const chunks = await chunker('export const x = 1', { id: 'test.ts' })
     expect(chunks.length).toBeGreaterThanOrEqual(1)
+    expect(chunks[0]!.text).toContain('export const x = 1')
   })
 })
