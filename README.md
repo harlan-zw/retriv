@@ -45,8 +45,8 @@ pnpm add retriv
 1. Install extra dependencies:
 
 ```bash
-# sqlite-vec for vector storage, transformers for local embeddings
-pnpm add sqlite-vec @huggingface/transformers
+# typescript for AST chunking, sqlite-vec for vector storage, transformers for local embeddings
+pnpm add typescript sqlite-vec @huggingface/transformers
 ```
 
 2. Create your retriv search instance:
@@ -179,37 +179,19 @@ const search = await createRetriv({
 
 ### Chunking
 
-Chunking is opt-in. Pass a chunker from `retriv/chunkers/*` to split documents before indexing:
+Chunking is opt-in via `retriv/chunkers/*`:
 
 ```ts
 import { autoChunker } from 'retriv/chunkers/auto'
 import { markdownChunker } from 'retriv/chunkers/markdown'
 import { codeChunker } from 'retriv/chunkers/typescript'
 
-// Markdown-aware splitting with configurable sizes
-chunking: markdownChunker({ chunkSize: 500, chunkOverlap: 100 })
-
-// Auto-detect by file extension (TS/JS → code, else → markdown)
-chunking: autoChunker()
-
-// AST-aware code splitting (TypeScript/JavaScript only)
-chunking: codeChunker({
-  maxChunkSize: 2000,
-  filterImports: false,
-  overlapLines: 0,
-})
-
-// Or pass any function matching the Chunker type
-chunking: (content, meta) => [{ text: content }]
+chunking: autoChunker() // Routes by file extension
+chunking: markdownChunker() // Heading-aware splitting
+chunking: codeChunker() // AST-aware (TS/JS only)
 ```
 
-The auto chunker picks strategy by file extension:
-
-| File type | Strategy | What it does |
-|-----------|----------|--------------|
-| `.ts` `.tsx` `.js` `.jsx` `.mjs` `.mts` `.cjs` `.cts` | TypeScript compiler API | Splits on function/class boundaries, extracts entities, scope, imports |
-| `.md` `.mdx` | Heading-aware | Splits on headings with configurable overlap |
-| Everything else | Heading-aware | Falls back to markdown-style splitting |
+The `autoChunker` routes by file extension — `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.mts`, `.cjs`, `.cts` use AST splitting, everything else uses heading-aware markdown splitting.
 
 ### Query Tokenization
 
