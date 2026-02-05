@@ -1,6 +1,7 @@
 import { defineBuildConfig } from 'obuild/config'
 
 export default defineBuildConfig({
+  externals: ['typescript'],
   entries: [
     {
       type: 'bundle',

@@ -132,7 +132,8 @@
     "ai": "^4.0.0 || ^5.0.0 || ^6.0.0",
     "ollama-ai-provider-v2": "^1.0.0",
     "pg": "^8.0.0",
-    "sqlite-vec": "^0.1.0-alpha.0"
+    "sqlite-vec": "^0.1.0-alpha.0",
+    "typescript": "^5.0.0"
   },
   "peerDependenciesMeta": {
     "@ai-sdk/cohere": {
@@ -166,6 +167,9 @@
       "optional": true
     },
     "sqlite-vec": {
+      "optional": true
+    },
+    "typescript": {
       "optional": true
     }
   },
