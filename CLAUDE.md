@@ -5,16 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pnpm build           # Build with obuild
+pnpm build           # Build with obuild (bundle entries in build.config.ts)
 pnpm dev:prepare     # Stub build for development
 pnpm test            # Run vitest (unit tests)
 pnpm test -- -t "chunks"  # Run single test by name
 pnpm test:e2e        # Run e2e tests (all local drivers)
 PG_URL=postgres://... pnpm test:e2e  # Include pgvector
 pnpm test:eval       # Run evaluation tests
-pnpm lint            # ESLint
+pnpm lint            # ESLint (@antfu/eslint-config)
 pnpm typecheck       # TypeScript check
 ```
+
+Requires Node.js >= 22.5 (for `node:sqlite`).
 
 ## Architecture
 
@@ -78,7 +80,20 @@ export default sqliteFts
 
 Vector drivers take `embeddings: EmbeddingConfig` from `retriv/embeddings/*`.
 
+Embedding providers use lazy-resolve with caching — `resolve()` is called once, result cached:
+```ts
+export function openai(options = {}): EmbeddingConfig {
+  let cached: ResolvedEmbedding | null = null
+  return { async resolve() {
+    if (cached)
+      return cached; cached = result; return cached
+  } }
+}
+```
+
 All drivers normalize scores to 0-1 range (higher = better match).
+
+Filter compilation has two SQL modes: `'json'` (SQLite `json_extract`) and `'jsonb'` (PostgreSQL `->>`). In-memory `matchesFilter()` is used by drivers without native SQL filtering (Upstash, Cloudflare) — these over-fetch 4x then filter client-side.
 
 ### Hybrid Search
 
@@ -104,9 +119,15 @@ Opt-in via `createRetriv({ categories: (doc) => string })`. When enabled:
 - Prevents one category (e.g. prose) from drowning out another (e.g. code)
 - Works with composed drivers (double RRF: inner driver fusion + outer category fusion)
 
+### Rerankers
+
+Optional post-search reranking via `retriv/rerankers/*`. Rerankers over-fetch (`limit * 3`) then trim to requested limit. Not in `build.config.ts` — used at runtime only.
+
 ### Test Infrastructure
 
-Vitest workspace with three projects:
+Vitest config with three projects (in `vitest.config.ts`):
 - **unit** - `test/**/*.test.ts` (excludes e2e)
 - **e2e** - `test/e2e/**/*.test.ts` (excludes eval)
 - **eval** - `test/**/*.eval.test.ts`
+
+E2E tests skip drivers when env vars are missing (e.g. `PG_URL` for pgvector). Embedding-heavy tests use `beforeAll` with 300s timeout for model loading.
