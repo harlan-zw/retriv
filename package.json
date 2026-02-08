@@ -1,7 +1,7 @@
 {
   "name": "retriv",
   "type": "module",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "packageManager": "pnpm@10.28.2",
   "description": "Hybrid search for TypeScript/JavaScript projects with AST-aware chunking.",
   "author": {
