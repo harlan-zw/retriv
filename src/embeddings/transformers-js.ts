@@ -3,11 +3,22 @@ import { rm } from 'node:fs/promises'
 import { env, pipeline } from '@huggingface/transformers'
 import { getModelDimensions, getModelMaxTokens, resolveModelForPreset } from './model-info'
 
+export interface TransformersProgressInfo {
+  status: 'initiate' | 'download' | 'progress' | 'done' | 'ready'
+  name: string
+  file: string
+  progress?: number
+  loaded?: number
+  total?: number
+}
+
 export interface TransformersEmbeddingOptions {
   /** Model name (e.g., 'bge-base-en-v1.5' or 'Xenova/bge-base-en-v1.5') */
   model?: string
   /** Embedding dimensions (auto-detected for known models) */
   dimensions?: number
+  /** Called with model download progress (initiate → download → progress → done → ready) */
+  onProgress?: (info: TransformersProgressInfo) => void
 }
 
 /**
@@ -51,10 +62,14 @@ export function transformersJs(options: TransformersEmbeddingOptions = {}): Embe
       if (cached)
         return cached
 
-      const extractor = await pipeline('feature-extraction', model, { dtype: 'fp32' })
+      const pipelineOpts: Record<string, unknown> = { dtype: 'fp32' }
+      if (options.onProgress)
+        pipelineOpts.progress_callback = options.onProgress
+
+      const extractor = await pipeline('feature-extraction', model, pipelineOpts)
         .catch(async (err) => {
           if (await clearCorruptedCache(err, model))
-            return pipeline('feature-extraction', model, { dtype: 'fp32' })
+            return pipeline('feature-extraction', model, pipelineOpts)
           throw err
         })
 
@@ -62,16 +77,12 @@ export function transformersJs(options: TransformersEmbeddingOptions = {}): Embe
       if (!dimensions)
         throw new Error(`Unknown dimensions for model ${model}. Please specify dimensions option.`)
 
-      const BATCH_SIZE = 64
       const embedder: EmbeddingProvider = async (texts) => {
-        const results: number[][] = []
-        for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-          const batch = texts.slice(i, i + BATCH_SIZE)
-          const output = await extractor(batch, { pooling: 'mean', normalize: true })
-          const data = output.data as Float32Array
-          for (let j = 0; j < batch.length; j++)
-            results.push(Array.from(data.subarray(j * dimensions, (j + 1) * dimensions)))
-        }
+        const output = await extractor(texts, { pooling: 'mean', normalize: true })
+        const data = output.data as Float32Array
+        const results: Float32Array[] = Array.from({ length: texts.length })
+        for (let i = 0; i < texts.length; i++)
+          results[i] = data.slice(i * dimensions, (i + 1) * dimensions)
         return results
       }
 

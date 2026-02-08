@@ -1,11 +1,12 @@
-import type { BaseDriverConfig, Document, EmbeddingConfig, IndexOptions, SearchOptions, SearchProvider, SearchResult } from '../types'
+import type { BaseDriverConfig, Document, Embedding, EmbeddingConfig, IndexOptions, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { resolveEmbedding } from '../embeddings/resolve'
 import { matchesFilter } from '../filter'
+import { embedBatch } from '../utils/embed-batch'
 import { extractSnippet } from '../utils/extract-snippet'
 
 // Cloudflare Vectorize binding type
 interface VectorizeIndexBinding {
-  query: (vector: number[], options?: any) => Promise<{ matches: any[], count?: number }>
+  query: (vector: Embedding, options?: any) => Promise<{ matches: any[], count?: number }>
   insert: (vectors: any[]) => Promise<void>
   upsert: (vectors: any[]) => Promise<void>
   deleteByIds: (ids: string[]) => Promise<void>
@@ -54,10 +55,8 @@ export async function cloudflare(config: CloudflareConfig): Promise<SearchProvid
       }
 
       const onProgress = options?.onProgress
-      onProgress?.({ phase: 'embedding', current: 0, total: docs.length })
       const texts = docs.map(d => d.content)
-      const embeddings = await embedder(texts)
-      onProgress?.({ phase: 'embedding', current: docs.length, total: docs.length })
+      const embeddings = await embedBatch(embedder, texts, onProgress)
 
       if (embeddings.length !== docs.length) {
         throw new Error(`Embedding count mismatch: expected ${docs.length}, got ${embeddings.length}`)

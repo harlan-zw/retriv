@@ -4,6 +4,7 @@ import { dirname } from 'node:path'
 import * as sqliteVecExt from 'sqlite-vec'
 import { resolveEmbedding } from '../embeddings/resolve'
 import { compileFilter } from '../filter'
+import { embedBatch } from '../utils/embed-batch'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface SqliteVecConfig extends BaseDriverConfig {
@@ -75,10 +76,8 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
         return { count: 0 }
 
       const onProgress = options?.onProgress
-      onProgress?.({ phase: 'embedding', current: 0, total: docs.length })
       const texts = docs.map(d => d.content)
-      const embeddings = await embedder(texts)
-      onProgress?.({ phase: 'embedding', current: docs.length, total: docs.length })
+      const embeddings = await embedBatch(embedder, texts, onProgress)
 
       if (embeddings.length !== docs.length) {
         throw new Error(`Embedding count mismatch: expected ${docs.length}, got ${embeddings.length}`)
@@ -95,7 +94,7 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
             throw new Error(`Vector dimension mismatch: expected ${dimensions}, got ${vector.length}`)
           }
 
-          const embedding = new Float32Array(vector)
+          const embedding = vector instanceof Float32Array ? vector : new Float32Array(vector)
 
           // Check if exists
           const existing = db.prepare('SELECT rowid FROM vector_metadata WHERE id = ?').get(doc.id) as { rowid: bigint } | undefined
@@ -139,7 +138,7 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
         throw new Error('Failed to generate query embedding')
       }
 
-      const queryEmbedding = new Float32Array(embedding)
+      const queryEmbedding = embedding instanceof Float32Array ? embedding : new Float32Array(embedding)
       const filterClause = compileFilter(filter, 'json')
       const filterWhere = filterClause.sql
         ? `AND rowid IN (SELECT rowid FROM vector_metadata WHERE ${filterClause.sql})`

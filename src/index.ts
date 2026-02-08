@@ -10,6 +10,7 @@ export type {
   ChunkInfo,
   ChunkSibling,
   Document,
+  Embedding,
   EmbeddingConfig,
   EmbeddingProvider,
   FilterOperator,

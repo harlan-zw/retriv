@@ -2,6 +2,7 @@ import type { BaseDriverConfig, Document, EmbeddingConfig, IndexOptions, SearchO
 import { createClient } from '@libsql/client'
 import { resolveEmbedding } from '../embeddings/resolve'
 import { compileFilter } from '../filter'
+import { embedBatch } from '../utils/embed-batch'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface LibsqlConfig extends BaseDriverConfig {
@@ -60,10 +61,8 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
         return { count: 0 }
 
       const onProgress = options?.onProgress
-      onProgress?.({ phase: 'embedding', current: 0, total: docs.length })
       const texts = docs.map(d => d.content)
-      const embeddings = await embedder(texts)
-      onProgress?.({ phase: 'embedding', current: docs.length, total: docs.length })
+      const embeddings = await embedBatch(embedder, texts, onProgress)
 
       if (embeddings.length !== docs.length) {
         throw new Error(`Embedding count mismatch: expected ${docs.length}, got ${embeddings.length}`)
@@ -72,7 +71,7 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
       for (let i = 0; i < docs.length; i++) {
         const doc = docs[i]!
         const vector = embeddings[i]!
-        const vectorStr = JSON.stringify(vector)
+        const vectorStr = vector instanceof Float32Array ? `[${vector.join(',')}]` : JSON.stringify(vector)
 
         await client.execute({
           sql: `
@@ -101,7 +100,7 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
         throw new Error('Failed to generate query embedding')
       }
 
-      const vectorStr = JSON.stringify(embedding)
+      const vectorStr = embedding instanceof Float32Array ? `[${embedding.join(',')}]` : JSON.stringify(embedding)
       const filterClause = filter ? compileFilter(filter, 'json') : { sql: '', params: [] }
       const whereClause = filterClause.sql ? `WHERE ${filterClause.sql}` : ''
 

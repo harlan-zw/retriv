@@ -2,6 +2,7 @@ import type { BaseDriverConfig, Document, EmbeddingConfig, IndexOptions, SearchO
 import pg from 'pg'
 import { resolveEmbedding } from '../embeddings/resolve'
 import { compileFilter, pgParams } from '../filter'
+import { embedBatch } from '../utils/embed-batch'
 import { extractSnippet } from '../utils/extract-snippet'
 
 export interface PgvectorConfig extends BaseDriverConfig {
@@ -75,10 +76,8 @@ export async function pgvector(config: PgvectorConfig): Promise<SearchProvider> 
         return { count: 0 }
 
       const onProgress = options?.onProgress
-      onProgress?.({ phase: 'embedding', current: 0, total: docs.length })
       const texts = docs.map(d => d.content)
-      const embeddings = await embedder(texts)
-      onProgress?.({ phase: 'embedding', current: docs.length, total: docs.length })
+      const embeddings = await embedBatch(embedder, texts, onProgress)
 
       if (embeddings.length !== docs.length) {
         throw new Error(`Embedding count mismatch: expected ${docs.length}, got ${embeddings.length}`)

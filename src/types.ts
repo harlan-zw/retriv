@@ -178,10 +178,15 @@ export interface RerankerConfig {
 // ============================================
 
 /**
+ * A single embedding vector — either a plain array or a typed array
+ */
+export type Embedding = number[] | Float32Array
+
+/**
  * Embedding provider function
  * Takes text(s) and returns embedding vectors
  */
-export type EmbeddingProvider = (texts: string[]) => Promise<number[][]>
+export type EmbeddingProvider = (texts: string[]) => Promise<Embedding[]>
 
 /**
  * Resolved embedding result
