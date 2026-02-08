@@ -1,4 +1,4 @@
-import type { BaseDriverConfig, Document, EmbeddingConfig, SearchOptions, SearchProvider, SearchResult } from '../types'
+import type { BaseDriverConfig, Document, EmbeddingConfig, IndexOptions, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { createClient } from '@libsql/client'
 import { resolveEmbedding } from '../embeddings/resolve'
 import { compileFilter } from '../filter'
@@ -55,12 +55,15 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
   `)
 
   return {
-    async index(docs: Document[]) {
+    async index(docs: Document[], options?: IndexOptions) {
       if (docs.length === 0)
         return { count: 0 }
 
+      const onProgress = options?.onProgress
+      onProgress?.({ phase: 'embedding', current: 0, total: docs.length })
       const texts = docs.map(d => d.content)
       const embeddings = await embedder(texts)
+      onProgress?.({ phase: 'embedding', current: docs.length, total: docs.length })
 
       if (embeddings.length !== docs.length) {
         throw new Error(`Embedding count mismatch: expected ${docs.length}, got ${embeddings.length}`)
@@ -83,6 +86,8 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
             vectorStr,
           ],
         })
+
+        onProgress?.({ phase: 'storing', current: i + 1, total: docs.length })
       }
 
       return { count: docs.length }

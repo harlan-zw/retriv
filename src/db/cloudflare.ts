@@ -1,4 +1,4 @@
-import type { BaseDriverConfig, Document, EmbeddingConfig, SearchOptions, SearchProvider, SearchResult } from '../types'
+import type { BaseDriverConfig, Document, EmbeddingConfig, IndexOptions, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { resolveEmbedding } from '../embeddings/resolve'
 import { matchesFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
@@ -48,17 +48,22 @@ export async function cloudflare(config: CloudflareConfig): Promise<SearchProvid
   const { embedder } = await resolveEmbedding(config.embeddings)
 
   return {
-    async index(docs: Document[]) {
+    async index(docs: Document[], options?: IndexOptions) {
       if (docs.length === 0) {
         return { count: 0 }
       }
 
+      const onProgress = options?.onProgress
+      onProgress?.({ phase: 'embedding', current: 0, total: docs.length })
       const texts = docs.map(d => d.content)
       const embeddings = await embedder(texts)
+      onProgress?.({ phase: 'embedding', current: docs.length, total: docs.length })
 
       if (embeddings.length !== docs.length) {
         throw new Error(`Embedding count mismatch: expected ${docs.length}, got ${embeddings.length}`)
       }
+
+      onProgress?.({ phase: 'storing', current: 0, total: docs.length })
 
       const vectors = docs.map((doc, i) => ({
         id: doc.id,
@@ -70,6 +75,8 @@ export async function cloudflare(config: CloudflareConfig): Promise<SearchProvid
       }))
 
       await binding.upsert(vectors)
+
+      onProgress?.({ phase: 'storing', current: docs.length, total: docs.length })
 
       return { count: docs.length }
     },

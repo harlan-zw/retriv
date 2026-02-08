@@ -177,6 +177,69 @@ Conclusion with final thoughts.`
     expect(results[0]!._chunk).toBeDefined()
   })
 
+  it('reports onProgress for storing phase', async () => {
+    const progress: Array<{ phase: string, current: number, total: number }> = []
+    const retriv = await createRetriv({
+      driver: sqliteFts({ path: ':memory:' }),
+    })
+
+    await retriv.index(
+      [
+        { id: '1', content: 'Hello world' },
+        { id: '2', content: 'Goodbye world' },
+        { id: '3', content: 'Another doc' },
+      ],
+      { onProgress: p => progress.push({ ...p }) },
+    )
+
+    // FTS driver only has storing phase
+    expect(progress.length).toBe(3)
+    expect(progress.every(p => p.phase === 'storing')).toBe(true)
+    expect(progress.map(p => p.current)).toEqual([1, 2, 3])
+    expect(progress.every(p => p.total === 3)).toBe(true)
+  })
+
+  it('reports onProgress chunking phase when chunker enabled', async () => {
+    const progress: Array<{ phase: string, current: number, total: number }> = []
+    const retriv = await createRetriv({
+      driver: sqliteFts({ path: ':memory:' }),
+      chunking: markdownChunker({ chunkSize: 20, chunkOverlap: 0 }),
+    })
+
+    await retriv.index(
+      [
+        { id: 'a', content: 'First part.\n\nSecond part.' },
+        { id: 'b', content: 'Third part.\n\nFourth part.' },
+      ],
+      { onProgress: p => progress.push({ ...p }) },
+    )
+
+    const chunking = progress.filter(p => p.phase === 'chunking')
+    const storing = progress.filter(p => p.phase === 'storing')
+
+    expect(chunking.length).toBe(2)
+    expect(chunking.map(p => p.current)).toEqual([1, 2])
+    expect(chunking.every(p => p.total === 2)).toBe(true)
+
+    // storing total reflects expanded chunk count
+    expect(storing.length).toBeGreaterThan(0)
+    expect(storing.at(-1)!.current).toBe(storing.at(-1)!.total)
+  })
+
+  it('works fine without onProgress', async () => {
+    const retriv = await createRetriv({
+      driver: sqliteFts({ path: ':memory:' }),
+    })
+
+    // no options arg at all
+    await retriv.index([{ id: '1', content: 'test' }])
+    // explicit undefined
+    await retriv.index([{ id: '2', content: 'test2' }], {})
+
+    const results = await retriv.search('test')
+    expect(results.length).toBeGreaterThanOrEqual(1)
+  })
+
   // Composed drivers and hybrid sqlite tests are in test/e2e/retriv.test.ts
   // (they require embedding models which are slow to load)
 })

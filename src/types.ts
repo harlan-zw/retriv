@@ -96,13 +96,35 @@ export interface SearchOptions {
 }
 
 /**
+ * Progress phases during indexing
+ */
+export type IndexPhase = 'chunking' | 'embedding' | 'storing'
+
+/**
+ * Progress info emitted during indexing
+ */
+export interface IndexProgress {
+  phase: IndexPhase
+  current: number
+  total: number
+}
+
+/**
+ * Options for the index operation
+ */
+export interface IndexOptions {
+  /** Called with progress updates during indexing */
+  onProgress?: (progress: IndexProgress) => void
+}
+
+/**
  * Search provider interface - unified across all driver types
  */
 export interface SearchProvider {
   /**
    * Index documents for search
    */
-  index: (docs: Document[]) => Promise<{ count: number }>
+  index: (docs: Document[], options?: IndexOptions) => Promise<{ count: number }>
 
   /**
    * Search for documents

@@ -1,4 +1,4 @@
-import type { BaseDriverConfig, Document, SearchOptions, SearchProvider, SearchResult } from '../types'
+import type { BaseDriverConfig, Document, IndexOptions, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { Index } from '@upstash/vector'
 import { matchesFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
@@ -41,10 +41,13 @@ export async function upstash(config: UpstashConfig): Promise<SearchProvider> {
   const ns = namespace || 'chunks'
 
   return {
-    async index(docs: Document[]) {
+    async index(docs: Document[], options?: IndexOptions) {
       if (docs.length === 0) {
         return { count: 0 }
       }
+
+      const onProgress = options?.onProgress
+      onProgress?.({ phase: 'storing', current: 0, total: docs.length })
 
       const upstashVectors = docs.map(doc => ({
         id: doc.id,
@@ -56,6 +59,8 @@ export async function upstash(config: UpstashConfig): Promise<SearchProvider> {
       }))
 
       await index.upsert(upstashVectors, { namespace: ns })
+
+      onProgress?.({ phase: 'storing', current: docs.length, total: docs.length })
 
       return { count: docs.length }
     },

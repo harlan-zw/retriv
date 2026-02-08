@@ -1,4 +1,4 @@
-import type { ChunkEntity, ComposedDriver, Document, DriverInput, RetrivOptions, SearchOptions, SearchProvider, SearchResult } from './types'
+import type { ChunkEntity, ComposedDriver, Document, DriverInput, IndexOptions, RetrivOptions, SearchOptions, SearchProvider, SearchResult } from './types'
 import { tokenizeCodeQuery } from './utils/code-tokenize'
 
 const RRF_K = 60
@@ -73,7 +73,7 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
   const seenCategories = new Set<string>()
   const categorize = options.categories
 
-  async function prepareDocs(docs: Document[]): Promise<Document[]> {
+  async function prepareDocs(docs: Document[], onProgress?: IndexOptions['onProgress']): Promise<Document[]> {
     if (categorize) {
       for (const doc of docs) {
         const cat = categorize(doc)
@@ -87,7 +87,9 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
 
     const chunkedDocs: Document[] = []
 
-    for (const doc of docs) {
+    for (let di = 0; di < docs.length; di++) {
+      const doc = docs[di]!
+      onProgress?.({ phase: 'chunking', current: di + 1, total: docs.length })
       const chunks = await chunker(doc.content, { id: doc.id, metadata: doc.metadata })
 
       if (chunks.length <= 1) {
@@ -155,9 +157,9 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
   }
 
   return {
-    async index(docs: Document[]) {
-      const prepared = await prepareDocs(docs)
-      const results = await Promise.all(drivers.map(d => d.index(prepared)))
+    async index(docs: Document[], options?: IndexOptions) {
+      const prepared = await prepareDocs(docs, options?.onProgress)
+      const results = await Promise.all(drivers.map(d => d.index(prepared, options)))
       return { count: results[0].count }
     },
 

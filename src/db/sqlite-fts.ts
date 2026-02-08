@@ -1,4 +1,4 @@
-import type { BaseDriverConfig, Document, SearchOptions, SearchProvider, SearchResult } from '../types'
+import type { BaseDriverConfig, Document, IndexOptions, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { compileFilter } from '../filter'
@@ -76,10 +76,12 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
   `)
 
   return {
-    async index(docs: Document[]) {
+    async index(docs: Document[], options?: IndexOptions) {
+      const onProgress = options?.onProgress
       db.prepare('BEGIN').run()
       try {
-        for (const doc of docs) {
+        for (let i = 0; i < docs.length; i++) {
+          const doc = docs[i]!
           const metadataJson = doc.metadata ? JSON.stringify(doc.metadata) : null
 
           // FTS5: upsert
@@ -95,6 +97,8 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
             doc.content,
             metadataJson,
           )
+
+          onProgress?.({ phase: 'storing', current: i + 1, total: docs.length })
         }
         db.prepare('COMMIT').run()
         return { count: docs.length }
