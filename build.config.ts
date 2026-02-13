@@ -25,6 +25,7 @@ export default defineBuildConfig({
         './src/embeddings/transformers-js.ts',
         './src/embeddings/mistral.ts',
         './src/embeddings/cohere.ts',
+        './src/embeddings/cached.ts',
         './src/embeddings/resolve.ts',
         './src/embeddings/model-info.ts',
         // Chunkers
