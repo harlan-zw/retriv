@@ -47,6 +47,10 @@
       "types": "./dist/db/cloudflare.d.mts",
       "import": "./dist/db/cloudflare.mjs"
     },
+    "./embeddings/cached": {
+      "types": "./dist/embeddings/cached.d.mts",
+      "import": "./dist/embeddings/cached.mjs"
+    },
     "./embeddings/openai": {
       "types": "./dist/embeddings/openai.d.mts",
       "import": "./dist/embeddings/openai.mjs"
