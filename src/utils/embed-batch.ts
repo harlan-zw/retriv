@@ -30,7 +30,7 @@ export async function embedBatch(
   const indices = Array.from({ length: total }, (_, i) => i)
   indices.sort((a, b) => texts[a]!.length - texts[b]!.length)
 
-  const results: Embedding[] = new Array(total)
+  const results: Embedding[] = Array.from<Embedding>({ length: total })
   let processed = 0
 
   while (processed < total) {
