@@ -40,6 +40,12 @@ Building search for TS/JS codebases is harder than it looks:
 pnpm add retriv
 ```
 
+> [!TIP]
+> Generate an Agent Skill for this package using [skilld](https://github.com/harlan-zw/skilld):
+> ```bash
+> npx skilld add retriv
+> ```
+
 ## Quick Start - Local Hybrid Search
 
 1. Install extra dependencies:
