@@ -137,7 +137,7 @@
     "ollama-ai-provider-v2": "^1.0.0",
     "pg": "^8.0.0",
     "sqlite-vec": "^0.1.0-alpha.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0 || ^6.0.0-0"
   },
   "peerDependenciesMeta": {
     "@ai-sdk/cohere": {
