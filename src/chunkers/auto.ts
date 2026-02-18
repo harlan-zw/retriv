@@ -2,7 +2,6 @@ import type { Chunker, ChunkerChunk } from '../types'
 import type { MarkdownChunkerOptions } from './markdown'
 import type { CodeChunkerOptions } from './typescript'
 import { markdownChunker } from './markdown'
-import { codeChunker } from './typescript'
 
 const CODE_EXTENSIONS = new Set([
   'ts',
@@ -36,14 +35,20 @@ export interface AutoChunkerOptions {
  */
 export function autoChunker(options: AutoChunkerOptions = {}): Chunker {
   const mdChunker = markdownChunker(options.markdown)
-  const codeChunkerFn = codeChunker(options.code)
+  let codeChunkerFn: Chunker | undefined
 
   return async (content: string, meta?): Promise<ChunkerChunk[]> => {
     const filePath = meta?.id || ''
     const type = detectContentType(filePath)
 
     if (type === 'code') {
-      return codeChunkerFn(content, meta)
+      if (!codeChunkerFn) {
+        codeChunkerFn = await import('./typescript')
+          .then(m => m.codeChunker(options.code))
+          .catch(() => undefined)
+      }
+      if (codeChunkerFn)
+        return codeChunkerFn(content, meta)
     }
     return mdChunker(content, meta)
   }

@@ -1,5 +1,16 @@
+import type TS from 'typescript'
 import type { ChunkEntity, Chunker, ChunkerChunk, ChunkImport, ChunkSibling } from '../types'
-import ts from 'typescript'
+
+let ts: typeof TS
+
+async function loadTS(): Promise<typeof TS> {
+  if (ts)
+    return ts
+  ts = await import('typescript').then(m => m.default || m).catch(() => {
+    throw new Error('typescript is required for codeChunker — install it with: npm i typescript')
+  })
+  return ts
+}
 
 export interface CodeChunkerOptions {
   /** Max chunk size in bytes. Default: 1000 (or derived from maxTokens) */
@@ -25,7 +36,7 @@ function resolveOptions(options: CodeChunkerOptions = {}) {
   return { maxChunkSize, filterImports, overlapLines }
 }
 
-function getNodeKind(node: ts.Node): string {
+function getNodeKind(node: TS.Node): string {
   if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node))
     return 'function'
   if (ts.isClassDeclaration(node) || ts.isClassExpression(node))
@@ -53,7 +64,7 @@ function getNodeKind(node: ts.Node): string {
   return 'unknown'
 }
 
-function getNodeName(node: ts.Node): string | undefined {
+function getNodeName(node: TS.Node): string | undefined {
   if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node)
     || ts.isTypeAliasDeclaration(node) || ts.isEnumDeclaration(node) || ts.isModuleDeclaration(node)) {
     return node.name?.getText()
@@ -68,7 +79,7 @@ function getNodeName(node: ts.Node): string | undefined {
   return undefined
 }
 
-function getSignature(node: ts.Node, _sourceFile: ts.SourceFile): string {
+function getSignature(node: TS.Node, _sourceFile: TS.SourceFile): string {
   // For functions, build signature manually to handle anonymous functions safely
   if (ts.isFunctionDeclaration(node)) {
     const name = node.name?.getText() || 'anonymous'
@@ -109,7 +120,7 @@ function getSignature(node: ts.Node, _sourceFile: ts.SourceFile): string {
 }
 
 interface ParsedDeclaration {
-  node: ts.Node
+  node: TS.Node
   name: string
   type: string
   signature: string
@@ -120,7 +131,7 @@ interface ParsedDeclaration {
   children: ParsedDeclaration[]
 }
 
-function extractImports(sourceFile: ts.SourceFile): ChunkImport[] {
+function extractImports(sourceFile: TS.SourceFile): ChunkImport[] {
   const imports: ChunkImport[] = []
 
   for (const stmt of sourceFile.statements) {
@@ -158,10 +169,10 @@ function extractImports(sourceFile: ts.SourceFile): ChunkImport[] {
   return imports
 }
 
-function parseDeclarations(sourceFile: ts.SourceFile): ParsedDeclaration[] {
+function parseDeclarations(sourceFile: TS.SourceFile): ParsedDeclaration[] {
   const declarations: ParsedDeclaration[] = []
 
-  function visit(node: ts.Node, parent?: ParsedDeclaration) {
+  function visit(node: TS.Node, parent?: ParsedDeclaration) {
     const kind = getNodeKind(node)
     const name = getNodeName(node)
 
@@ -280,7 +291,7 @@ function splitIntoChunks(
   declarations: ParsedDeclaration[],
   maxChunkSize: number,
   filterImports: boolean,
-  sourceFile: ts.SourceFile,
+  sourceFile: TS.SourceFile,
 ): ChunkRange[] {
   if (content.length <= maxChunkSize) {
     // Single chunk
@@ -404,6 +415,8 @@ export function codeChunker(options: CodeChunkerOptions = {}): Chunker {
   const opts = resolveOptions(options)
 
   return async (content: string, meta?): Promise<ChunkerChunk[]> => {
+    await loadTS()
+
     const filepath = meta?.id || 'file.ts'
 
     // Determine script kind from extension
