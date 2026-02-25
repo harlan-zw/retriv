@@ -65,4 +65,29 @@ describe('splitText', () => {
       expect(chunk.index).toBe(i)
     })
   })
+
+  it('provides correct line ranges', () => {
+    const text = 'Line 1\nLine 2\nLine 3\n\nLine 5\nLine 6\nLine 7'
+    const chunks = splitText(text, { chunkSize: 20, chunkOverlap: 0 })
+
+    expect(chunks.length).toBeGreaterThanOrEqual(2)
+    // First chunk starts at line 1
+    expect(chunks[0]!.lines[0]).toBe(1)
+    // Later chunks must start after line 1
+    expect(chunks.at(-1)!.lines[0]).toBeGreaterThan(1)
+    // Each chunk's end line >= start line
+    chunks.forEach((chunk) => {
+      expect(chunk.lines[1]).toBeGreaterThanOrEqual(chunk.lines[0])
+    })
+  })
+
+  it('gives distinct line ranges to different chunks', () => {
+    const text = Array.from({ length: 20 }, (_, i) => `Line ${i + 1} content here`).join('\n\n')
+    const chunks = splitText(text, { chunkSize: 80, chunkOverlap: 0 })
+
+    expect(chunks.length).toBeGreaterThanOrEqual(3)
+    // No two chunks should have identical line ranges
+    const keys = chunks.map(c => `${c.lines[0]}-${c.lines[1]}`)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
 })
