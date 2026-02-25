@@ -17,6 +17,7 @@ export function markdownChunker(options: MarkdownChunkerOptions = {}): Chunker {
     return chunks.map(c => ({
       text: c.text,
       range: c.range,
+      lineRange: c.lines,
     }))
   }
 }
