@@ -1,7 +1,6 @@
 import type { Document, EmbeddingConfig, IndexOptions, SearchOptions, SearchProvider, SearchResult } from '../types'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import * as sqliteVecExt from 'sqlite-vec'
 import { resolveEmbedding } from '../embeddings/resolve'
 import { compileFilter } from '../filter'
 import { embedBatch } from '../utils/embed-batch'
@@ -24,11 +23,17 @@ function extractHeaders(content: string): string {
     .join('\n')
 }
 
+export interface SqliteVecLoader {
+  load: (db: { loadExtension: (file: string, entrypoint?: string) => void }) => void
+}
+
 export interface SqliteConfig {
   /** Path to SQLite database file. Use ':memory:' for in-memory. */
   path?: string
   /** Embedding provider from retriv/embeddings/ */
   embeddings: EmbeddingConfig
+  /** sqlite-vec module. Pass `import('sqlite-vec')` or `import * as vec from 'sqlite-vec'; vec` to avoid bundling issues. Falls back to dynamic import if not provided. */
+  sqliteVec?: SqliteVecLoader
 }
 
 /**
@@ -109,7 +114,8 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
     readOnly: false,
   })
 
-  sqliteVecExt.load(db)
+  const vec = config.sqliteVec ?? await import('sqlite-vec')
+  vec.load(db)
 
   // FTS5 table for BM25 search (headers weighted higher)
   db.exec(`
