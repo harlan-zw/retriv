@@ -37,6 +37,8 @@ function compileOp(ref: string, op: FilterOperator): CompiledFilter {
   if ('$lte' in op)
     return { sql: `${ref} <= ?`, params: [op.$lte] }
   if ('$in' in op) {
+    if (op.$in.length === 0)
+      return { sql: '1 = 0', params: [] }
     const placeholders = op.$in.map(() => '?').join(', ')
     return { sql: `${ref} IN (${placeholders})`, params: [...op.$in] }
   }
