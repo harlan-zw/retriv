@@ -44,6 +44,16 @@ describe('compileFilter', () => {
     expect(compileFilter({}, 'json')).toEqual({ sql: '', params: [] })
   })
 
+  it('rejects field names with SQL injection characters', () => {
+    expect(() => compileFilter({ 'x\' OR 1=1 --': 'val' }, 'json')).toThrow('Invalid filter field name')
+    expect(() => compileFilter({ 'field; DROP TABLE': 'val' }, 'jsonb')).toThrow('Invalid filter field name')
+  })
+
+  it('allows dotted and underscored field names', () => {
+    expect(() => compileFilter({ 'nested.field': 'val' }, 'json')).not.toThrow()
+    expect(() => compileFilter({ snake_case: 'val' }, 'json')).not.toThrow()
+  })
+
   describe('json mode (SQLite)', () => {
     it('compiles exact match', () => {
       const result = compileFilter({ category: 'blog' }, 'json')
