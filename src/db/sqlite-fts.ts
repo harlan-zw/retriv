@@ -17,13 +17,16 @@ export function sanitizeFtsTokens(query: string): string[] {
 /**
  * Build an FTS5 MATCH expression from tokens.
  * mode='and' = implicit AND (FTS5 default), mode='or' = explicit OR.
+ * Tokens are quoted to prevent FTS5 keyword collision (NOT, AND, OR).
  */
 export function buildFtsQuery(tokens: string[], mode: 'and' | 'or' = 'and'): string {
   if (tokens.length === 0)
     return ''
   if (tokens.length === 1)
-    return tokens[0]!
-  return mode === 'or' ? tokens.join(' OR ') : tokens.join(' ')
+    return `"${tokens[0]!.replace(/"/g, '""')}"`
+  const quoted = tokens.map(t => `"${t.replace(/"/g, '""')}"`)
+
+  return mode === 'or' ? quoted.join(' OR ') : quoted.join(' ')
 }
 
 export interface SqliteFtsConfig extends BaseDriverConfig {
