@@ -17,6 +17,8 @@ function sqlVal(v: string | number | boolean): string | number {
 }
 
 function fieldRef(field: string, mode: FilterMode, table?: string): string {
+  if (!/^[\w.]+$/.test(field))
+    throw new Error(`Invalid filter field name: "${field}"`)
   const col = table ? `${table}.metadata` : 'metadata'
   return mode === 'json'
     ? `json_extract(${col}, '$.${field}')`
