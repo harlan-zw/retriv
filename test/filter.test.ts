@@ -93,6 +93,12 @@ describe('compileFilter', () => {
       expect(result.params).toEqual(['a', 'b', 'c'])
     })
 
+    it('compiles $in with empty array to always-false clause', () => {
+      const result = compileFilter({ tag: { $in: [] } }, 'json')
+      expect(result.sql).toBe('1 = 0')
+      expect(result.params).toEqual([])
+    })
+
     it('compiles $prefix', () => {
       const result = compileFilter({ path: { $prefix: '/docs/' } }, 'json')
       expect(result.sql).toBe(`json_extract(metadata, '$.path') LIKE ?`)
@@ -131,6 +137,12 @@ describe('compileFilter', () => {
       const result = compileFilter({ tag: { $in: [1, 2] } }, 'jsonb')
       expect(result.sql).toBe(`metadata->>'tag' IN (?, ?)`)
       expect(result.params).toEqual([1, 2])
+    })
+
+    it('compiles $in with empty array to always-false clause', () => {
+      const result = compileFilter({ tag: { $in: [] } }, 'jsonb')
+      expect(result.sql).toBe('1 = 0')
+      expect(result.params).toEqual([])
     })
 
     it('compiles $prefix', () => {
@@ -208,6 +220,11 @@ describe('matchesFilter', () => {
     expect(matchesFilter({ x: { $in: [1, 2] } }, { x: 2 })).toBe(true)
   })
 
+  it('$in with empty array matches nothing', () => {
+    expect(matchesFilter({ x: { $in: [] } }, { x: 'a' })).toBe(false)
+    expect(matchesFilter({ x: { $in: [] } }, { x: 1 })).toBe(false)
+  })
+
   it('matches $prefix', () => {
     expect(matchesFilter({ path: { $prefix: '/docs/' } }, { path: '/docs/intro' })).toBe(true)
     expect(matchesFilter({ path: { $prefix: '/docs/' } }, { path: '/blog/post' })).toBe(false)
@@ -278,6 +295,17 @@ describe('sqlite-fts filter', () => {
     ])
     const results = await db.search('guide', { filter: { source: { $prefix: 'docs/' } } })
     expect(results).toHaveLength(2)
+    await db.close?.()
+  })
+
+  it('returns no results for empty $in array', async () => {
+    const db = await sqliteFts({ path: ':memory:' })
+    await db.index([
+      { id: '1', content: 'hello world', metadata: { type: 'markdown' } },
+      { id: '2', content: 'hello earth', metadata: { type: 'code' } },
+    ])
+    const results = await db.search('hello', { filter: { type: { $in: [] } } })
+    expect(results).toHaveLength(0)
     await db.close?.()
   })
 
