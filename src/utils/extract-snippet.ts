@@ -76,6 +76,10 @@ const STOPWORDS = new Set([
   'only',
 ])
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /**
  * BM25-style term scoring for highlights
  * Scores terms by: inverse frequency in content (rarer = better) + not stopword
@@ -88,7 +92,7 @@ function scoreTerms(terms: string[], content: string): Array<{ term: string, sco
     .filter(t => contentLower.includes(t))
     .map((term) => {
       // Count occurrences
-      const regex = new RegExp(term, 'gi')
+      const regex = new RegExp(escapeRegex(term), 'gi')
       const matches = contentLower.match(regex)
       const tf = matches ? matches.length : 0
 
