@@ -43,7 +43,7 @@ describe('buildFtsQuery', () => {
   })
 })
 
-describe('FTS5 keyword integration', () => {
+describe('fts5 keyword integration', () => {
   it('searching for "not" does not negate results', async () => {
     const { sqliteFts } = await import('../src/db/sqlite-fts')
     const db = await sqliteFts({ path: ':memory:' })
