@@ -23,6 +23,11 @@ function fieldRef(field: string, mode: FilterMode, table?: string): string {
     : `${col}->>'${field}'`
 }
 
+/** Escape SQL LIKE wildcards so $prefix matches literally */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
 function compileOp(ref: string, op: FilterOperator): CompiledFilter {
   if ('$eq' in op)
     return { sql: `${ref} = ?`, params: [sqlVal(op.$eq)] }
@@ -43,7 +48,7 @@ function compileOp(ref: string, op: FilterOperator): CompiledFilter {
     return { sql: `${ref} IN (${placeholders})`, params: [...op.$in] }
   }
   if ('$prefix' in op)
-    return { sql: `${ref} LIKE ?`, params: [`${op.$prefix}%`] }
+    return { sql: `${ref} LIKE ? ESCAPE '\\'`, params: [`${escapeLike(op.$prefix)}%`] }
   if ('$exists' in op) {
     return op.$exists
       ? { sql: `${ref} IS NOT NULL`, params: [] }

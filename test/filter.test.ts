@@ -101,8 +101,25 @@ describe('compileFilter', () => {
 
     it('compiles $prefix', () => {
       const result = compileFilter({ path: { $prefix: '/docs/' } }, 'json')
-      expect(result.sql).toBe(`json_extract(metadata, '$.path') LIKE ?`)
+      expect(result.sql).toBe(`json_extract(metadata, '$.path') LIKE ? ESCAPE '\\'`)
       expect(result.params).toEqual(['/docs/%'])
+    })
+
+    it('compiles $prefix escaping LIKE wildcards', () => {
+      const result = compileFilter({ path: { $prefix: 'my_file' } }, 'json')
+      expect(result.sql).toBe(`json_extract(metadata, '$.path') LIKE ? ESCAPE '\\'`)
+      expect(result.params).toEqual(['my\\_file%'])
+    })
+
+    it('compiles $prefix escaping percent sign', () => {
+      const result = compileFilter({ path: { $prefix: '100%' } }, 'json')
+      expect(result.params).toEqual(['100\\%%'])
+    })
+
+    it('compiles $prefix escaping backslashes', () => {
+      const result = compileFilter({ path: { $prefix: 'C:\\Users' } }, 'json')
+      expect(result.sql).toBe(`json_extract(metadata, '$.path') LIKE ? ESCAPE '\\'`)
+      expect(result.params).toEqual(['C:\\\\Users%'])
     })
 
     it('compiles $exists true', () => {
@@ -147,7 +164,7 @@ describe('compileFilter', () => {
 
     it('compiles $prefix', () => {
       const result = compileFilter({ name: { $prefix: 'foo' } }, 'jsonb')
-      expect(result.sql).toBe(`metadata->>'name' LIKE ?`)
+      expect(result.sql).toBe(`metadata->>'name' LIKE ? ESCAPE '\\'`)
       expect(result.params).toEqual(['foo%'])
     })
   })
@@ -295,6 +312,18 @@ describe('sqlite-fts filter', () => {
     ])
     const results = await db.search('guide', { filter: { source: { $prefix: 'docs/' } } })
     expect(results).toHaveLength(2)
+    await db.close?.()
+  })
+
+  it('$prefix treats underscores literally', async () => {
+    const db = await sqliteFts({ path: ':memory:' })
+    await db.index([
+      { id: '1', content: 'file alpha', metadata: { name: 'my_file.ts' } },
+      { id: '2', content: 'file beta', metadata: { name: 'myXfile.ts' } },
+    ])
+    const results = await db.search('file', { filter: { name: { $prefix: 'my_' } } })
+    expect(results).toHaveLength(1)
+    expect(results[0]!.id).toBe('1')
     await db.close?.()
   })
 
