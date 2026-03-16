@@ -177,6 +177,60 @@ describe('compileFilter', () => {
       expect(result.sql).toBe(`metadata->>'name' LIKE ? ESCAPE '\\'`)
       expect(result.params).toEqual(['foo%'])
     })
+
+    it('casts numeric $gt to ::numeric', () => {
+      const result = compileFilter({ score: { $gt: 5 } }, 'jsonb')
+      expect(result.sql).toBe(`(metadata->>'score')::numeric > ?`)
+      expect(result.params).toEqual([5])
+    })
+
+    it('casts numeric $gte to ::numeric', () => {
+      const result = compileFilter({ score: { $gte: 10 } }, 'jsonb')
+      expect(result.sql).toBe(`(metadata->>'score')::numeric >= ?`)
+      expect(result.params).toEqual([10])
+    })
+
+    it('casts numeric $lt to ::numeric', () => {
+      const result = compileFilter({ score: { $lt: 3 } }, 'jsonb')
+      expect(result.sql).toBe(`(metadata->>'score')::numeric < ?`)
+      expect(result.params).toEqual([3])
+    })
+
+    it('casts numeric $lte to ::numeric', () => {
+      const result = compileFilter({ score: { $lte: 7 } }, 'jsonb')
+      expect(result.sql).toBe(`(metadata->>'score')::numeric <= ?`)
+      expect(result.params).toEqual([7])
+    })
+
+    it('casts numeric $eq to ::numeric', () => {
+      const result = compileFilter({ count: { $eq: 42 } }, 'jsonb')
+      expect(result.sql).toBe(`(metadata->>'count')::numeric = ?`)
+      expect(result.params).toEqual([42])
+    })
+
+    it('does not cast string $eq', () => {
+      const result = compileFilter({ status: { $eq: 'active' } }, 'jsonb')
+      expect(result.sql).toBe(`metadata->>'status' = ?`)
+      expect(result.params).toEqual(['active'])
+    })
+
+    it('casts numeric $ne to ::numeric', () => {
+      const result = compileFilter({ count: { $ne: 0 } }, 'jsonb')
+      expect(result.sql).toBe(`(metadata->>'count')::numeric != ?`)
+      expect(result.params).toEqual([0])
+    })
+
+    it('casts numeric exact match shorthand to ::numeric', () => {
+      const result = compileFilter({ score: 100 }, 'jsonb')
+      expect(result.sql).toBe(`(metadata->>'score')::numeric = ?`)
+      expect(result.params).toEqual([100])
+    })
+
+    it('does not cast string exact match shorthand', () => {
+      const result = compileFilter({ category: 'blog' }, 'jsonb')
+      expect(result.sql).toBe(`metadata->>'category' = ?`)
+      expect(result.params).toEqual(['blog'])
+    })
   })
 })
 

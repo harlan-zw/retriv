@@ -30,19 +30,25 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, '\\$&')
 }
 
-function compileOp(ref: string, op: FilterOperator): CompiledFilter {
-  if ('$eq' in op)
-    return { sql: `${ref} = ?`, params: [sqlVal(op.$eq)] }
-  if ('$ne' in op)
-    return { sql: `${ref} != ?`, params: [sqlVal(op.$ne)] }
+function compileOp(ref: string, op: FilterOperator, mode: FilterMode): CompiledFilter {
+  // PostgreSQL ->> returns TEXT; numeric comparisons need an explicit cast
+  const numRef = mode === 'jsonb' ? `(${ref})::numeric` : ref
+  if ('$eq' in op) {
+    const r = typeof op.$eq === 'number' ? numRef : ref
+    return { sql: `${r} = ?`, params: [sqlVal(op.$eq)] }
+  }
+  if ('$ne' in op) {
+    const r = typeof op.$ne === 'number' ? numRef : ref
+    return { sql: `${r} != ?`, params: [sqlVal(op.$ne)] }
+  }
   if ('$gt' in op)
-    return { sql: `${ref} > ?`, params: [op.$gt] }
+    return { sql: `${numRef} > ?`, params: [op.$gt] }
   if ('$gte' in op)
-    return { sql: `${ref} >= ?`, params: [op.$gte] }
+    return { sql: `${numRef} >= ?`, params: [op.$gte] }
   if ('$lt' in op)
-    return { sql: `${ref} < ?`, params: [op.$lt] }
+    return { sql: `${numRef} < ?`, params: [op.$lt] }
   if ('$lte' in op)
-    return { sql: `${ref} <= ?`, params: [op.$lte] }
+    return { sql: `${numRef} <= ?`, params: [op.$lte] }
   if ('$in' in op) {
     if (op.$in.length === 0)
       return { sql: '1 = 0', params: [] }
@@ -74,13 +80,14 @@ export function compileFilter(filter: SearchFilter | undefined, mode: FilterMode
   for (const [field, value] of Object.entries(filter)) {
     const ref = fieldRef(field, mode, table)
     if (isOperator(value)) {
-      const compiled = compileOp(ref, value)
+      const compiled = compileOp(ref, value, mode)
       clauses.push(compiled.sql)
       params.push(...compiled.params)
     }
     else {
       // Exact match shorthand
-      clauses.push(`${ref} = ?`)
+      const matchRef = mode === 'jsonb' && typeof value === 'number' ? `(${ref})::numeric` : ref
+      clauses.push(`${matchRef} = ?`)
       params.push(sqlVal(value))
     }
   }
