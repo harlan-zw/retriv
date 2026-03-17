@@ -306,7 +306,8 @@ describe('reranking', () => {
     // reranker that promotes results with "answer" in content
     const rerankerFn = vi.fn(async (_q: string, results: any[]) => {
       const withContent = results.filter((r: any) => r.content)
-      if (withContent.length === 0) return results // no-op without content
+      if (withContent.length === 0)
+        return results // no-op without content
       return [...results].sort((a, b) =>
         (b.content?.includes('answer') ? 1 : 0) - (a.content?.includes('answer') ? 1 : 0),
       )
