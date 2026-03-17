@@ -9,7 +9,7 @@ import { createRetriv } from '../src/retriv'
 
 const mockEmbeddings = {
   resolve: async () => ({
-    embedder: async (texts: string[]) => texts.map(() => Array.from({ length: 3 }).fill(Math.random())),
+    embedder: async (texts: string[]) => texts.map(() => Array.from<number>({ length: 3 }).fill(Math.random())),
     dimensions: 3,
   }),
 }
@@ -243,7 +243,7 @@ describe('compileFilter', () => {
       expect(result.sql).toBe(`metadata->>'category' = ?`)
       expect(result.params).toEqual(['blog'])
     })
-    
+
     it('compiles $contains', () => {
       const result = compileFilter({ path: { $contains: 'utils' } }, 'jsonb')
       expect(result.sql).toBe(`metadata->>'path' LIKE ? ESCAPE '\\'`)
