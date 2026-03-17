@@ -290,6 +290,62 @@ describe('reranking', () => {
     expect(results).toHaveLength(2)
   })
 
+  it('forces returnContent for reranker even when user omits it', async () => {
+    const driver = {
+      async index() { return { count: 0 } },
+      async search(_q: string, opts?: any) {
+        // return content only when asked
+        return [
+          { id: 'a', score: 0.9, ...(opts?.returnContent && { content: 'irrelevant stuff' }) },
+          { id: 'b', score: 0.8, ...(opts?.returnContent && { content: 'the actual answer' }) },
+        ]
+      },
+    }
+    const searchSpy = vi.spyOn(driver, 'search')
+
+    // reranker that promotes results with "answer" in content
+    const rerankerFn = vi.fn(async (_q: string, results: any[]) => {
+      const withContent = results.filter((r: any) => r.content)
+      if (withContent.length === 0) return results // no-op without content
+      return [...results].sort((a, b) =>
+        (b.content?.includes('answer') ? 1 : 0) - (a.content?.includes('answer') ? 1 : 0),
+      )
+    })
+
+    const retriv = await createRetriv({
+      driver,
+      rerank: { resolve: async () => rerankerFn },
+    })
+
+    await retriv.index([])
+    // user does NOT pass returnContent
+    const results = await retriv.search('test', { limit: 2 })
+
+    // driver should have been called with returnContent: true
+    expect(searchSpy).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ returnContent: true }))
+    // reranker should have reordered (b first because "answer")
+    expect(results[0].id).toBe('b')
+    // content should be stripped since user didn't request it
+    expect(results[0].content).toBeUndefined()
+    expect(results[1].content).toBeUndefined()
+  })
+
+  it('preserves content when user requests it with reranker', async () => {
+    const rerankerFn = vi.fn(async (_q: string, results: any[]) => results)
+
+    const retriv = await createRetriv({
+      driver: mockDriver([
+        { id: 'a', score: 0.9, content: 'hello world' },
+      ]),
+      rerank: { resolve: async () => rerankerFn },
+    })
+
+    await retriv.index([])
+    const results = await retriv.search('test', { returnContent: true })
+
+    expect(results[0].content).toBe('hello world')
+  })
+
   it('works without reranker (no-op)', async () => {
     const retriv = await createRetriv({
       driver: mockDriver([{ id: 'a', score: 0.9 }]),
