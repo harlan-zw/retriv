@@ -76,8 +76,11 @@ const STOPWORDS = new Set([
   'only',
 ])
 
+const RE_ESCAPE_REGEX = /[.*+?^${}()|[\]\\]/g
+const RE_WHITESPACE = /\s+/
+
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return str.replace(RE_ESCAPE_REGEX, '\\$&')
 }
 
 /**
@@ -120,7 +123,7 @@ function scoreTerms(terms: string[], content: string): Array<{ term: string, sco
 export function extractSnippet(content: string, query: string, contextLines = 2): SnippetResult {
   const lines = content.split('\n')
   const totalContext = contextLines * 2 + 1
-  const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2)
+  const queryWords = query.toLowerCase().split(RE_WHITESPACE).filter(w => w.length > 2)
 
   // BM25-scored highlights (top 5 most relevant terms)
   const scoredTerms = scoreTerms(queryWords, content)

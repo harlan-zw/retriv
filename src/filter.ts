@@ -1,5 +1,9 @@
 import type { FilterOperator, SearchFilter } from './types'
 
+const RE_VALID_FIELD = /^[\w.]+$/
+const RE_LIKE_ESCAPE = /[\\%_]/g
+const RE_PLACEHOLDER = /\?/g
+
 type FilterMode = 'json' | 'jsonb'
 
 interface CompiledFilter {
@@ -17,7 +21,7 @@ function sqlVal(v: string | number | boolean): string | number {
 }
 
 function fieldRef(field: string, mode: FilterMode, table?: string): string {
-  if (!/^[\w.]+$/.test(field))
+  if (!RE_VALID_FIELD.test(field))
     throw new Error(`Invalid filter field name: "${field}"`)
   const col = table ? `${table}.metadata` : 'metadata'
   return mode === 'json'
@@ -27,7 +31,7 @@ function fieldRef(field: string, mode: FilterMode, table?: string): string {
 
 /** Escape SQL LIKE wildcards so $prefix matches literally */
 function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&')
+  return value.replace(RE_LIKE_ESCAPE, '\\$&')
 }
 
 function compileOp(ref: string, op: FilterOperator, mode: FilterMode): CompiledFilter {
@@ -57,6 +61,8 @@ function compileOp(ref: string, op: FilterOperator, mode: FilterMode): CompiledF
   }
   if ('$prefix' in op)
     return { sql: `${ref} LIKE ? ESCAPE '\\'`, params: [`${escapeLike(op.$prefix)}%`] }
+  if ('$contains' in op)
+    return { sql: `${ref} LIKE ? ESCAPE '\\'`, params: [`%${escapeLike(op.$contains)}%`] }
   if ('$exists' in op) {
     return op.$exists
       ? { sql: `${ref} IS NOT NULL`, params: [] }
@@ -112,6 +118,8 @@ function matchOp(actual: unknown, op: FilterOperator): boolean {
     return op.$in.includes(actual as string | number)
   if ('$prefix' in op)
     return typeof actual === 'string' && actual.startsWith(op.$prefix)
+  if ('$contains' in op)
+    return typeof actual === 'string' && actual.includes(op.$contains)
   if ('$exists' in op)
     return op.$exists ? actual != null : actual == null
   return false
@@ -146,5 +154,5 @@ export function matchesFilter(filter: SearchFilter | undefined, metadata: Record
  */
 export function pgParams(sql: string, offset: number = 1): string {
   let i = offset
-  return sql.replace(/\?/g, () => `$${i++}`)
+  return sql.replace(RE_PLACEHOLDER, () => `$${i++}`)
 }

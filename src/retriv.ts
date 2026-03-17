@@ -169,15 +169,18 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
       const fetchLimit = reranker && searchOptions.limit
         ? searchOptions.limit * 3
         : searchOptions.limit
-      const fetchOptions = fetchLimit
-        ? { ...searchOptions, limit: fetchLimit }
-        : searchOptions
+      const fetchOptions: SearchOptions = {
+        ...searchOptions,
+        ...(fetchLimit && { limit: fetchLimit }),
+        // rerankers need content to score — force it on, strip later if not requested
+        ...(reranker && { returnContent: true }),
+      }
 
       let results: SearchResult[]
 
       if (seenCategories.size > 1) {
         const categoryResults = await Promise.all(
-          [...seenCategories].map((cat) => {
+          Array.from(seenCategories, (cat) => {
             const catOptions = {
               ...fetchOptions,
               filter: { ...fetchOptions.filter, category: { $eq: cat } },
@@ -203,8 +206,12 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
         results = applyRRF(resultSets)
       }
 
-      if (reranker)
+      if (reranker) {
         results = await reranker(query, results)
+        // strip content if user didn't ask for it (we forced it on for reranking)
+        if (!searchOptions.returnContent)
+          results = results.map(({ content: _, ...rest }) => rest)
+      }
 
       if (searchOptions.limit)
         results = results.slice(0, searchOptions.limit)

@@ -8,6 +8,9 @@ import { extractSnippet } from '../utils/extract-snippet'
 import { buildFtsQuery, sanitizeFtsTokens } from './sqlite-fts'
 
 const RRF_K = 60
+const RE_CODE_BLOCKS = /```[\s\S]*?```/g
+const RE_HEADING = /^#{1,6}\s/
+const RE_HEADING_PREFIX = /^#{1,6}\s+/
 
 /**
  * Extract markdown headers from content
@@ -15,11 +18,11 @@ const RRF_K = 60
  */
 function extractHeaders(content: string): string {
   // Strip fenced code blocks to avoid false positives
-  const withoutCodeBlocks = content.replace(/```[\s\S]*?```/g, '')
+  const withoutCodeBlocks = content.replace(RE_CODE_BLOCKS, '')
   return withoutCodeBlocks
     .split('\n')
-    .filter(line => /^#{1,6}\s/.test(line))
-    .map(line => line.replace(/^#{1,6}\s+/, ''))
+    .filter(line => RE_HEADING.test(line))
+    .map(line => line.replace(RE_HEADING_PREFIX, ''))
     .join('\n')
 }
 
