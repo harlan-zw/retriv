@@ -22,6 +22,7 @@ describe('searchFilter types', () => {
     expectTypeOf<{ $gt: number }>().toMatchTypeOf<FilterValue>()
     expectTypeOf<{ $in: string[] }>().toMatchTypeOf<FilterValue>()
     expectTypeOf<{ $prefix: string }>().toMatchTypeOf<FilterValue>()
+    expectTypeOf<{ $contains: string }>().toMatchTypeOf<FilterValue>()
     expectTypeOf<{ $exists: boolean }>().toMatchTypeOf<FilterValue>()
   })
 
@@ -132,6 +133,17 @@ describe('compileFilter', () => {
       expect(result.params).toEqual(['C:\\\\Users%'])
     })
 
+    it('compiles $contains', () => {
+      const result = compileFilter({ path: { $contains: 'utils' } }, 'json')
+      expect(result.sql).toBe(`json_extract(metadata, '$.path') LIKE ? ESCAPE '\\'`)
+      expect(result.params).toEqual(['%utils%'])
+    })
+
+    it('compiles $contains escaping LIKE wildcards', () => {
+      const result = compileFilter({ path: { $contains: 'my_file' } }, 'json')
+      expect(result.params).toEqual(['%my\\_file%'])
+    })
+
     it('compiles $exists true', () => {
       const result = compileFilter({ image: { $exists: true } }, 'json')
       expect(result.sql).toBe(`json_extract(metadata, '$.image') IS NOT NULL`)
@@ -176,6 +188,12 @@ describe('compileFilter', () => {
       const result = compileFilter({ name: { $prefix: 'foo' } }, 'jsonb')
       expect(result.sql).toBe(`metadata->>'name' LIKE ? ESCAPE '\\'`)
       expect(result.params).toEqual(['foo%'])
+    })
+
+    it('compiles $contains', () => {
+      const result = compileFilter({ path: { $contains: 'utils' } }, 'jsonb')
+      expect(result.sql).toBe(`metadata->>'path' LIKE ? ESCAPE '\\'`)
+      expect(result.params).toEqual(['%utils%'])
     })
   })
 })
@@ -261,6 +279,15 @@ describe('matchesFilter', () => {
     expect(matchesFilter({ x: { $prefix: 'foo' } }, { x: 123 })).toBe(false)
   })
 
+  it('matches $contains', () => {
+    expect(matchesFilter({ path: { $contains: 'utils' } }, { path: 'src/utils/helper.ts' })).toBe(true)
+    expect(matchesFilter({ path: { $contains: 'utils' } }, { path: 'src/db/sqlite.ts' })).toBe(false)
+  })
+
+  it('$contains returns false for non-string', () => {
+    expect(matchesFilter({ x: { $contains: 'foo' } }, { x: 42 })).toBe(false)
+  })
+
   it('matches $exists true', () => {
     expect(matchesFilter({ img: { $exists: true } }, { img: 'url' })).toBe(true)
     expect(matchesFilter({ img: { $exists: true } }, { other: 1 })).toBe(false)
@@ -322,6 +349,19 @@ describe('sqlite-fts filter', () => {
     ])
     const results = await db.search('guide', { filter: { source: { $prefix: 'docs/' } } })
     expect(results).toHaveLength(2)
+    await db.close?.()
+  })
+
+  it('filters by $contains', async () => {
+    const db = await sqliteFts({ path: ':memory:' })
+    await db.index([
+      { id: '1', content: 'utility helpers', metadata: { path: 'src/utils/helper.ts' } },
+      { id: '2', content: 'utility tools', metadata: { path: 'src/utils/tools.ts' } },
+      { id: '3', content: 'utility db', metadata: { path: 'src/db/sqlite.ts' } },
+    ])
+    const results = await db.search('utility', { filter: { path: { $contains: 'utils' } } })
+    expect(results).toHaveLength(2)
+    expect(results.every(r => r.id !== '3')).toBe(true)
     await db.close?.()
   })
 

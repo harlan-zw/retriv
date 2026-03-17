@@ -51,6 +51,8 @@ function compileOp(ref: string, op: FilterOperator): CompiledFilter {
   }
   if ('$prefix' in op)
     return { sql: `${ref} LIKE ? ESCAPE '\\'`, params: [`${escapeLike(op.$prefix)}%`] }
+  if ('$contains' in op)
+    return { sql: `${ref} LIKE ? ESCAPE '\\'`, params: [`%${escapeLike(op.$contains)}%`] }
   if ('$exists' in op) {
     return op.$exists
       ? { sql: `${ref} IS NOT NULL`, params: [] }
@@ -105,6 +107,8 @@ function matchOp(actual: unknown, op: FilterOperator): boolean {
     return op.$in.includes(actual as string | number)
   if ('$prefix' in op)
     return typeof actual === 'string' && actual.startsWith(op.$prefix)
+  if ('$contains' in op)
+    return typeof actual === 'string' && actual.includes(op.$contains)
   if ('$exists' in op)
     return op.$exists ? actual != null : actual == null
   return false

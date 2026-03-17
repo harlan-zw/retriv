@@ -66,6 +66,7 @@ export type FilterOperator
     | { $lte: number }
     | { $in: (string | number)[] }
     | { $prefix: string }
+    | { $contains: string }
     | { $exists: boolean }
 
 /**
