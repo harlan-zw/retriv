@@ -1,3 +1,9 @@
+const RE_CAMEL_SPLIT = /([a-z])([A-Z])/g
+const RE_UPPER_SPLIT = /([A-Z]+)([A-Z][a-z])/g
+const RE_CAMEL_CASE = /[a-z][A-Z]/
+const RE_UPPER_LOWER = /[A-Z][A-Z][a-z]/
+const RE_WHITESPACE = /\s+/
+
 /**
  * Split a compound identifier into parts.
  * getUserName -> ['get', 'User', 'Name']
@@ -14,8 +20,8 @@ function splitIdentifier(token: string): string[] {
     return token.split('_').filter(Boolean)
   }
   // Split camelCase/PascalCase
-  const parts = token.replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+  const parts = token.replace(RE_CAMEL_SPLIT, '$1 $2')
+    .replace(RE_UPPER_SPLIT, '$1 $2')
     .split(' ')
     .filter(Boolean)
   return parts.length > 1 ? parts : [token]
@@ -25,8 +31,8 @@ function splitIdentifier(token: string): string[] {
  * Check if a token looks like a code identifier
  */
 function isCodeIdentifier(token: string): boolean {
-  return /[a-z][A-Z]/.test(token)
-    || /[A-Z][A-Z][a-z]/.test(token)
+  return RE_CAMEL_CASE.test(token)
+    || RE_UPPER_LOWER.test(token)
     || token.includes('_')
     || token.includes('.')
 }
@@ -40,7 +46,7 @@ function isCodeIdentifier(token: string): boolean {
  * Natural language queries pass through unchanged.
  */
 export function tokenizeCodeQuery(query: string): string {
-  const tokens = query.split(/\s+/).filter(Boolean)
+  const tokens = query.split(RE_WHITESPACE).filter(Boolean)
   const expanded: string[] = []
 
   for (const token of tokens) {

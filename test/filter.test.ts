@@ -9,7 +9,7 @@ import { createRetriv } from '../src/retriv'
 
 const mockEmbeddings = {
   resolve: async () => ({
-    embedder: async (texts: string[]) => texts.map(() => Array.from({ length: 3 }, () => Math.random())),
+    embedder: async (texts: string[]) => texts.map(() => Array.from({ length: 3 }).fill(Math.random())),
     dimensions: 3,
   }),
 }

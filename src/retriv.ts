@@ -180,7 +180,7 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
 
       if (seenCategories.size > 1) {
         const categoryResults = await Promise.all(
-          [...seenCategories].map((cat) => {
+          Array.from(seenCategories, (cat) => {
             const catOptions = {
               ...fetchOptions,
               filter: { ...fetchOptions.filter, category: { $eq: cat } },

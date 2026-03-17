@@ -4,13 +4,17 @@ import { dirname } from 'node:path'
 import { compileFilter } from '../filter'
 import { extractSnippet } from '../utils/extract-snippet'
 
+const RE_FTS_SPECIAL = /[?"():^*\-=<>[\]{}/\\|@#$%&~`+,.;!]/g
+const RE_WHITESPACE = /\s+/
+const RE_DOUBLE_QUOTE = /"/g
+
 /**
  * Sanitize a query string for FTS5 — strip special chars, return tokens.
  */
 export function sanitizeFtsTokens(query: string): string[] {
   return query
-    .replace(/[?"():^*\-=<>[\]{}/\\|@#$%&~`+,.;!]/g, ' ')
-    .split(/\s+/)
+    .replace(RE_FTS_SPECIAL, ' ')
+    .split(RE_WHITESPACE)
     .filter(t => t.length > 0)
 }
 
@@ -23,8 +27,8 @@ export function buildFtsQuery(tokens: string[], mode: 'and' | 'or' = 'and'): str
   if (tokens.length === 0)
     return ''
   if (tokens.length === 1)
-    return `"${tokens[0]!.replace(/"/g, '""')}"`
-  const quoted = tokens.map(t => `"${t.replace(/"/g, '""')}"`)
+    return `"${tokens[0]!.replace(RE_DOUBLE_QUOTE, '""')}"`
+  const quoted = tokens.map(t => `"${t.replace(RE_DOUBLE_QUOTE, '""')}"`)
 
   return mode === 'or' ? quoted.join(' OR ') : quoted.join(' ')
 }

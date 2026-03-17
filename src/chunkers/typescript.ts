@@ -327,7 +327,7 @@ function splitIntoChunks(
 
     if (currentSize > maxChunkSize && currentEntities.length > 0) {
       // Flush current chunk
-      const lastEntity = currentEntities[currentEntities.length - 1]!
+      const lastEntity = currentEntities.at(-1)!
       const { line: lineStart } = sourceFile.getLineAndCharacterOfPosition(currentStart)
       const { line: lineEnd } = sourceFile.getLineAndCharacterOfPosition(lastEntity.end)
 
@@ -345,7 +345,7 @@ function splitIntoChunks(
     else if (declSize > maxChunkSize) {
       // Single large declaration - split it
       if (currentEntities.length > 0) {
-        const lastEntity = currentEntities[currentEntities.length - 1]!
+        const lastEntity = currentEntities.at(-1)!
         const { line: lineStart } = sourceFile.getLineAndCharacterOfPosition(currentStart)
         const { line: lineEnd } = sourceFile.getLineAndCharacterOfPosition(lastEntity.end)
         chunks.push({
@@ -378,7 +378,7 @@ function splitIntoChunks(
 
   // Flush remaining
   if (currentEntities.length > 0) {
-    const lastEntity = currentEntities[currentEntities.length - 1]!
+    const lastEntity = currentEntities.at(-1)!
     const { line: lineStart } = sourceFile.getLineAndCharacterOfPosition(currentStart)
     const { line: lineEnd } = sourceFile.getLineAndCharacterOfPosition(lastEntity.end)
     chunks.push({

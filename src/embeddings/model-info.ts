@@ -81,6 +81,8 @@ export const MODEL_MAX_TOKENS: Record<string, number> = {
   'embeddinggemma-300m': 512,
 }
 
+const RE_MODEL_PREFIX = /^(Xenova\/|onnx-community\/)/
+
 /**
  * Get dimensions for a model (returns undefined if unknown)
  */
@@ -90,7 +92,7 @@ export function getModelDimensions(model: string): number | undefined {
     return MODEL_DIMENSIONS[model]
 
   // Strip common prefixes (Xenova/, onnx-community/, etc)
-  const normalized = model.replace(/^(Xenova\/|onnx-community\/)/, '')
+  const normalized = model.replace(RE_MODEL_PREFIX, '')
   return MODEL_DIMENSIONS[normalized]
 }
 
@@ -100,7 +102,7 @@ export function getModelDimensions(model: string): number | undefined {
 export function getModelMaxTokens(model: string): number | undefined {
   if (MODEL_MAX_TOKENS[model])
     return MODEL_MAX_TOKENS[model]
-  const normalized = model.replace(/^(Xenova\/|onnx-community\/)/, '')
+  const normalized = model.replace(RE_MODEL_PREFIX, '')
   return MODEL_MAX_TOKENS[normalized]
 }
 
