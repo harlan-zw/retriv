@@ -228,7 +228,15 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
 
     async listIds() {
       const driver = drivers.find(d => d.listIds)
-      return driver?.listIds?.() ?? []
+      const ids = await driver?.listIds?.() ?? []
+      if (!chunker)
+        return ids
+      const parentIds = new Set<string>()
+      for (const id of ids) {
+        const sep = id.indexOf('#chunk-')
+        parentIds.add(sep >= 0 ? id.substring(0, sep) : id)
+      }
+      return Array.from(parentIds)
     },
 
     async clear() {
