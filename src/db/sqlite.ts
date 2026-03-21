@@ -333,6 +333,11 @@ export async function sqlite(config: SqliteConfig): Promise<SearchProvider> {
       }
     },
 
+    async listIds() {
+      const rows = db.prepare('SELECT id FROM documents_meta').all() as Array<{ id: string }>
+      return rows.map(r => r.id)
+    },
+
     async clear() {
       db.exec('DELETE FROM documents_fts')
       db.exec('DELETE FROM documents_vec')

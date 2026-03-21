@@ -138,6 +138,11 @@ export interface SearchProvider {
   remove?: (ids: string[]) => Promise<{ count: number }>
 
   /**
+   * List all indexed document IDs
+   */
+  listIds?: () => Promise<string[]>
+
+  /**
    * Clear all indexed documents
    */
   clear?: () => Promise<void>
