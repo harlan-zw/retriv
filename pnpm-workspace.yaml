@@ -3,27 +3,27 @@ shellEmulator: true
 trustPolicy: no-downgrade
 
 catalog:
-  '@ai-sdk/cohere': ^3.0.25
-  '@ai-sdk/google': ^3.0.43
-  '@ai-sdk/mistral': ^3.0.24
-  '@ai-sdk/openai': ^3.0.41
+  '@ai-sdk/cohere': ^3.0.27
+  '@ai-sdk/google': ^3.0.52
+  '@ai-sdk/mistral': ^3.0.27
+  '@ai-sdk/openai': ^3.0.47
   '@antfu/eslint-config': ^7.7.3
   '@arethetypeswrong/cli': ^0.18.2
   '@cloudflare/workers-types': ^4.20260317.1
   '@huggingface/transformers': ^3.8.1
-  '@libsql/client': ^0.17.0
+  '@libsql/client': ^0.17.2
   '@types/node': ^25.5.0
-  '@types/pg': ^8.18.0
+  '@types/pg': ^8.20.0
   '@upstash/vector': ^1.2.3
   '@vitest/coverage-v8': ^4.1.0
-  ai: ^6.0.116
+  ai: ^6.0.134
   ai-sdk-provider-gemini-cli: ^2.0.1
   bumpp: ^11.0.1
-  eslint: ^10.0.3
+  eslint: ^10.1.0
   obuild: ^0.4.32
   osgrep: ^0.5.16
   pg: ^8.20.0
-  sqlite-vec: ^0.1.7-alpha.2
+  sqlite-vec: ^0.1.7
   typescript: ^5.9.3
   vitest: ^4.1.0
   zod: ^4.3.6
