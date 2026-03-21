@@ -226,6 +226,11 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
       return { count: results[0]?.count ?? 0 }
     },
 
+    async listIds() {
+      const driver = drivers.find(d => d.listIds)
+      return driver?.listIds?.() ?? []
+    },
+
     async clear() {
       await Promise.all(drivers.filter(d => d.clear).map(d => d.clear!()))
       parentDocs.clear()
