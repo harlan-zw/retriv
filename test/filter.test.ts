@@ -359,6 +359,8 @@ describe('matchesFilter', () => {
   it('$nin with empty array matches everything', () => {
     expect(matchesFilter({ x: { $nin: [] } }, { x: 'a' })).toBe(true)
     expect(matchesFilter({ x: { $nin: [] } }, { x: 1 })).toBe(true)
+    expect(matchesFilter({ x: { $nin: [] } }, { other: 1 })).toBe(true)
+    expect(matchesFilter({ x: { $nin: [] } }, {})).toBe(true)
   })
 
   it('$nin returns false for missing field (matches SQL NULL semantics)', () => {
