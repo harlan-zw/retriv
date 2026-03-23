@@ -21,6 +21,7 @@ describe('searchFilter types', () => {
     expectTypeOf<boolean>().toMatchTypeOf<FilterValue>()
     expectTypeOf<{ $gt: number }>().toMatchTypeOf<FilterValue>()
     expectTypeOf<{ $in: string[] }>().toMatchTypeOf<FilterValue>()
+    expectTypeOf<{ $nin: string[] }>().toMatchTypeOf<FilterValue>()
     expectTypeOf<{ $prefix: string }>().toMatchTypeOf<FilterValue>()
     expectTypeOf<{ $contains: string }>().toMatchTypeOf<FilterValue>()
     expectTypeOf<{ $exists: boolean }>().toMatchTypeOf<FilterValue>()
@@ -110,6 +111,18 @@ describe('compileFilter', () => {
       expect(result.params).toEqual([])
     })
 
+    it('compiles $nin', () => {
+      const result = compileFilter({ tag: { $nin: ['a', 'b'] } }, 'json')
+      expect(result.sql).toBe(`json_extract(metadata, '$.tag') NOT IN (?, ?)`)
+      expect(result.params).toEqual(['a', 'b'])
+    })
+
+    it('compiles $nin with empty array to always-true clause', () => {
+      const result = compileFilter({ tag: { $nin: [] } }, 'json')
+      expect(result.sql).toBe('1 = 1')
+      expect(result.params).toEqual([])
+    })
+
     it('compiles $prefix', () => {
       const result = compileFilter({ path: { $prefix: '/docs/' } }, 'json')
       expect(result.sql).toBe(`json_extract(metadata, '$.path') LIKE ? ESCAPE '\\'`)
@@ -181,6 +194,18 @@ describe('compileFilter', () => {
     it('compiles $in with empty array to always-false clause', () => {
       const result = compileFilter({ tag: { $in: [] } }, 'jsonb')
       expect(result.sql).toBe('1 = 0')
+      expect(result.params).toEqual([])
+    })
+
+    it('compiles $nin', () => {
+      const result = compileFilter({ status: { $nin: ['deleted', 'archived'] } }, 'jsonb')
+      expect(result.sql).toBe(`metadata->>'status' NOT IN (?, ?)`)
+      expect(result.params).toEqual(['deleted', 'archived'])
+    })
+
+    it('compiles $nin with empty array to always-true clause', () => {
+      const result = compileFilter({ tag: { $nin: [] } }, 'jsonb')
+      expect(result.sql).toBe('1 = 1')
       expect(result.params).toEqual([])
     })
 
@@ -324,6 +349,18 @@ describe('matchesFilter', () => {
     expect(matchesFilter({ x: { $in: [] } }, { x: 1 })).toBe(false)
   })
 
+  it('matches $nin', () => {
+    expect(matchesFilter({ x: { $nin: ['a', 'b'] } }, { x: 'c' })).toBe(true)
+    expect(matchesFilter({ x: { $nin: ['a', 'b'] } }, { x: 'a' })).toBe(false)
+    expect(matchesFilter({ x: { $nin: [1, 2] } }, { x: 3 })).toBe(true)
+    expect(matchesFilter({ x: { $nin: [1, 2] } }, { x: 1 })).toBe(false)
+  })
+
+  it('$nin with empty array matches everything', () => {
+    expect(matchesFilter({ x: { $nin: [] } }, { x: 'a' })).toBe(true)
+    expect(matchesFilter({ x: { $nin: [] } }, { x: 1 })).toBe(true)
+  })
+
   it('matches $prefix', () => {
     expect(matchesFilter({ path: { $prefix: '/docs/' } }, { path: '/docs/intro' })).toBe(true)
     expect(matchesFilter({ path: { $prefix: '/docs/' } }, { path: '/blog/post' })).toBe(false)
@@ -426,6 +463,19 @@ describe('sqlite-fts filter', () => {
       { id: '2', content: 'file beta', metadata: { name: 'myXfile.ts' } },
     ])
     const results = await db.search('file', { filter: { name: { $prefix: 'my_' } } })
+    expect(results).toHaveLength(1)
+    expect(results[0]!.id).toBe('1')
+    await db.close?.()
+  })
+
+  it('filters by $nin', async () => {
+    const db = await sqliteFts({ path: ':memory:' })
+    await db.index([
+      { id: '1', content: 'hello world', metadata: { type: 'markdown' } },
+      { id: '2', content: 'hello earth', metadata: { type: 'code' } },
+      { id: '3', content: 'hello mars', metadata: { type: 'docs' } },
+    ])
+    const results = await db.search('hello', { filter: { type: { $nin: ['code', 'docs'] } }, returnMetadata: true })
     expect(results).toHaveLength(1)
     expect(results[0]!.id).toBe('1')
     await db.close?.()
