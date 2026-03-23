@@ -59,6 +59,12 @@ function compileOp(ref: string, op: FilterOperator, mode: FilterMode): CompiledF
     const placeholders = op.$in.map(() => '?').join(', ')
     return { sql: `${ref} IN (${placeholders})`, params: [...op.$in] }
   }
+  if ('$nin' in op) {
+    if (op.$nin.length === 0)
+      return { sql: '1 = 1', params: [] }
+    const placeholders = op.$nin.map(() => '?').join(', ')
+    return { sql: `${ref} NOT IN (${placeholders})`, params: [...op.$nin] }
+  }
   if ('$prefix' in op)
     return { sql: `${ref} LIKE ? ESCAPE '\\'`, params: [`${escapeLike(op.$prefix)}%`] }
   if ('$contains' in op)
@@ -116,6 +122,8 @@ function matchOp(actual: unknown, op: FilterOperator): boolean {
     return typeof actual === 'number' && actual <= op.$lte
   if ('$in' in op)
     return op.$in.includes(actual as string | number)
+  if ('$nin' in op)
+    return op.$nin.length === 0 || (actual != null && !op.$nin.includes(actual as string | number))
   if ('$prefix' in op)
     return typeof actual === 'string' && actual.startsWith(op.$prefix)
   if ('$contains' in op)
