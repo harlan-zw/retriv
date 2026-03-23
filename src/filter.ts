@@ -123,7 +123,7 @@ function matchOp(actual: unknown, op: FilterOperator): boolean {
   if ('$in' in op)
     return op.$in.includes(actual as string | number)
   if ('$nin' in op)
-    return !op.$nin.includes(actual as string | number)
+    return actual != null && !op.$nin.includes(actual as string | number)
   if ('$prefix' in op)
     return typeof actual === 'string' && actual.startsWith(op.$prefix)
   if ('$contains' in op)

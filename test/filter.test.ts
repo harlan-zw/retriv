@@ -361,6 +361,11 @@ describe('matchesFilter', () => {
     expect(matchesFilter({ x: { $nin: [] } }, { x: 1 })).toBe(true)
   })
 
+  it('$nin returns false for missing field (matches SQL NULL semantics)', () => {
+    expect(matchesFilter({ x: { $nin: ['a'] } }, { other: 1 })).toBe(false)
+    expect(matchesFilter({ x: { $nin: ['a'] } }, {})).toBe(false)
+  })
+
   it('matches $prefix', () => {
     expect(matchesFilter({ path: { $prefix: '/docs/' } }, { path: '/docs/intro' })).toBe(true)
     expect(matchesFilter({ path: { $prefix: '/docs/' } }, { path: '/blog/post' })).toBe(false)
