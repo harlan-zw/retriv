@@ -207,6 +207,11 @@ export async function sqliteFts(config: SqliteFtsConfig = {}): Promise<SearchPro
       }
     },
 
+    async listIds() {
+      const rows = db.prepare('SELECT id FROM documents_meta').all() as { id: string }[]
+      return rows.map(r => r.id)
+    },
+
     async clear() {
       db.exec('DELETE FROM documents_fts')
       db.exec('DELETE FROM documents_meta')
