@@ -130,6 +130,26 @@ describe('createRetriv', () => {
     await retriv.close?.()
   })
 
+  it('removes chunked documents by parent id', async () => {
+    const retriv = await createRetriv({
+      driver: sqliteFts({ path: ':memory:' }),
+      chunking: markdownChunker({ chunkSize: 20, chunkOverlap: 0 }),
+    })
+
+    await retriv.index([
+      { id: 'doc1', content: 'First part.\n\nSecond part.\n\nThird part.' },
+      { id: 'doc2', content: 'Keep this.\n\nStill here.\n\nNot removed.' },
+    ])
+
+    await retriv.remove?.(['doc1'])
+
+    const doc1Results = await retriv.search('part', { limit: 10 })
+    const doc2Results = await retriv.search('keep', { limit: 10 })
+
+    expect(doc1Results.every(r => !r.id.startsWith('doc1'))).toBe(true)
+    expect(doc2Results.length).toBeGreaterThanOrEqual(1)
+  })
+
   it('extracts snippets with highlights', async () => {
     const retriv = await createRetriv({
       driver: sqliteFts({ path: ':memory:' }),

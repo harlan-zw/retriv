@@ -220,9 +220,25 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
     },
 
     async remove(ids: string[]) {
+      let removeIds = ids
+      if (chunker) {
+        const lister = drivers.find(d => d.listIds)
+        if (lister) {
+          const allIds = await lister.listIds!()
+          const idSet = new Set(ids)
+          removeIds = allIds.filter((id) => {
+            if (idSet.has(id))
+              return true
+            const sep = id.indexOf('#chunk-')
+            return sep >= 0 && idSet.has(id.substring(0, sep))
+          })
+        }
+      }
       const results = await Promise.all(
-        drivers.filter(d => d.remove).map(d => d.remove!(ids)),
+        drivers.filter(d => d.remove).map(d => d.remove!(removeIds)),
       )
+      for (const id of ids)
+        parentDocs.delete(id)
       return { count: results[0]?.count ?? 0 }
     },
 
