@@ -146,7 +146,7 @@ describe('createRetriv', () => {
     const doc1Results = await retriv.search('part', { limit: 10 })
     const doc2Results = await retriv.search('keep', { limit: 10 })
 
-    expect(doc1Results.every(r => !r.id.startsWith('doc1'))).toBe(true)
+    expect(doc1Results.filter(r => r.id.startsWith('doc1'))).toHaveLength(0)
     expect(doc2Results.length).toBeGreaterThanOrEqual(1)
   })
 

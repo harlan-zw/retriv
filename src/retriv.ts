@@ -223,16 +223,16 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
       let removeIds = ids
       if (chunker) {
         const lister = drivers.find(d => d.listIds)
-        if (lister) {
-          const allIds = await lister.listIds!()
-          const idSet = new Set(ids)
-          removeIds = allIds.filter((id) => {
-            if (idSet.has(id))
-              return true
-            const sep = id.indexOf('#chunk-')
-            return sep >= 0 && idSet.has(id.substring(0, sep))
-          })
-        }
+        if (!lister)
+          throw new Error('remove() with chunking requires a driver that implements listIds()')
+        const allIds = await lister.listIds!()
+        const idSet = new Set(ids)
+        removeIds = allIds.filter((id) => {
+          if (idSet.has(id))
+            return true
+          const sep = id.indexOf('#chunk-')
+          return sep >= 0 && idSet.has(id.substring(0, sep))
+        })
       }
       const results = await Promise.all(
         drivers.filter(d => d.remove).map(d => d.remove!(removeIds)),
