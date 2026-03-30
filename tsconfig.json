@@ -3,6 +3,7 @@
     "target": "esnext",
     "lib": ["ESNext"],
     "moduleDetection": "force",
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "rootDir": ".",
     "module": "preserve",
