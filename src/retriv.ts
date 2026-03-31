@@ -224,7 +224,7 @@ export async function createRetriv(options: RetrivOptions): Promise<SearchProvid
       if (chunker) {
         const lister = drivers.find(d => d.listIds)
         if (!lister)
-          throw new Error('remove() with chunking requires a driver that implements listIds()')
+          throw new Error('remove() with chunking requires a driver that implements listIds() — cloudflare does not support this')
         const allIds = await lister.listIds!()
         const idSet = new Set(ids)
         removeIds = allIds.filter((id) => {
