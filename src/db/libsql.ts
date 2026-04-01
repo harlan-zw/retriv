@@ -150,6 +150,11 @@ export async function libsql(config: LibsqlConfig): Promise<SearchProvider> {
       return { count: ids.length }
     },
 
+    async listIds() {
+      const result = await client.execute('SELECT id FROM vectors')
+      return (result.rows || []).map((row: any) => row.id as string)
+    },
+
     async clear() {
       await client.execute('DELETE FROM vectors')
     },

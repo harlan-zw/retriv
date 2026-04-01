@@ -162,6 +162,11 @@ export async function pgvector(config: PgvectorConfig): Promise<SearchProvider> 
       return { count: ids.length }
     },
 
+    async listIds() {
+      const result = await pool.query(`SELECT id FROM ${table}`)
+      return result.rows.map((row: any) => row.id as string)
+    },
+
     async clear() {
       await pool.query(`DELETE FROM ${table}`)
     },

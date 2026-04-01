@@ -206,6 +206,11 @@ export async function sqliteVec(config: SqliteVecConfig): Promise<SearchProvider
       }
     },
 
+    async listIds() {
+      const rows = db.prepare('SELECT id FROM vector_metadata').all() as { id: string }[]
+      return rows.map(r => r.id)
+    },
+
     async clear() {
       db.exec('DELETE FROM vectors')
       db.exec('DELETE FROM vector_metadata')

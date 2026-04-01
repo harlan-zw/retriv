@@ -110,6 +110,17 @@ export async function upstash(config: UpstashConfig): Promise<SearchProvider> {
       return { count: ids.length }
     },
 
+    async listIds() {
+      const ids: string[] = []
+      let cursor = '0'
+      do {
+        const page = await index.range({ cursor, limit: 1000, includeMetadata: false, includeVectors: false }, { namespace: ns })
+        for (const v of page.vectors) ids.push(v.id as string)
+        cursor = page.nextCursor
+      } while (cursor !== '0')
+      return ids
+    },
+
     async clear() {
       await index.reset({ namespace: ns })
     },

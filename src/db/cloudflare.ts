@@ -129,6 +129,10 @@ export async function cloudflare(config: CloudflareConfig): Promise<SearchProvid
       return { count: ids.length }
     },
 
+    // listIds() is not implemented — Cloudflare Vectorize Workers binding
+    // does not expose a list/range method (only available via REST API).
+    // This means remove() with chunking (via createRetriv) is not supported.
+
     async clear() {
       throw new Error('[cloudflare] clear() is not supported - use wrangler CLI instead')
     },
